@@ -41,7 +41,7 @@ linkedlist.o: $(IMP)linkedlist.cpp $(LSH)others.cpp
 
 runlsh:
 
-	./search -i input_file -q query_small_id -k 10 -L 10 -M 0 -probes 0 -o output.txt -algorithm LSH -metric no -delta 0.004
+	./search -i input_file -q query_small_id -k 10 -L 10 -M 0 -probes 0 -o output.txt -algorithm Frechet -metric discrete -delta 3.25
 
 #-N 5 -R 500
 #$./search –i <input file> –q <query file> –k <int> -L <int> -M <int> -probes

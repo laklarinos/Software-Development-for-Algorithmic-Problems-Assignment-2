@@ -212,6 +212,71 @@ using namespace std;
 //     return 0; //correct command line arguments
 // }
 
+vector<double> snap(int dim, map<double, double> &mapCurve, double delta, pair<double, double> txAndTy)
+{
+    // xi' = floor((x-t)/δ + 1/2)*δ + t
+    // yi' = floor((y-t)/δ + 1/2)*δ + t
+    // t should be different for each dimension
+    // δ should be one digit positive number...
+
+    int sizeOfMap = mapCurve.size();
+    std::default_random_engine generator;
+    std::uniform_real_distribution<double> distribution(0.0, delta);
+    double tx = distribution(generator);
+    double ty = distribution(generator);
+
+    double xiNew;
+    double yiNew;
+    double xi;
+    double yi;
+
+    vector<pair<double, double>> vecOfPairs;
+
+    for (int i = 0; i < sizeOfMap; i++)
+    {
+        std::map<double, double>::iterator it = mapCurve.begin();
+        advance(it, i);
+
+        xi = it->first;
+        yi = it->second;
+
+        xiNew = floor((xi - tx) / delta + 1 / 2) * delta + tx;
+        yiNew = floor((yi - ty) / delta + 1 / 2) * delta + ty;
+        vecOfPairs.push_back(pair<double, double>(xiNew, yiNew));
+    }
+
+    // eliminate duplications...
+    pair<double, double> tempPair = vecOfPairs[0];
+    for (int i = 1; i < sizeOfMap; i++)
+    {
+        pair<double, double> currPair = vecOfPairs[i];
+        if (tempPair.first == currPair.first && tempPair.second == currPair.second)
+        {
+            auto it = vecOfPairs.begin() + i;
+            vecOfPairs[i].first = 0;
+            vecOfPairs[i].second = 0;
+        }
+        else
+        {
+            tempPair = currPair;
+        }
+    }
+
+    vecOfPairs.erase(std::remove(vecOfPairs.begin(), vecOfPairs.end(), pair<double,double>(0,0)), vecOfPairs.end()); //erase remove technique
+
+    vector<double> vecToReturn;
+    sizeOfMap = vecOfPairs.size();
+
+    for (int i = 0; i < sizeOfMap; i++)
+    {
+        auto it = vecOfPairs.begin() + i;
+        vecToReturn.push_back(it->first);
+        vecToReturn.push_back(it->second);
+    }
+
+    return vecToReturn;
+}
+
 int euclideanRemainder(int a, int b)
 {
     assert(b != 0);

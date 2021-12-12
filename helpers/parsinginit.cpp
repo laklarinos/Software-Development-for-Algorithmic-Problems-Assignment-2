@@ -34,7 +34,6 @@ int parsInit(char *inputFile, vector<point> &vecPoints, int *numLinesReturn, int
         vector<float> vecFloat;
         string values;
         istringstream is2(line);
-        vecFloat.push_back(0.0);
         while (getline(is2, values, '\t'))
         {
             vecFloat.push_back(atof(values.c_str()));

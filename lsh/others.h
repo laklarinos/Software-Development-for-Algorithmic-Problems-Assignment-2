@@ -27,7 +27,9 @@ typedef struct lshConstants
 //bool checkCommandLineArguments(int argcInt, char *argvArray[]);
 int euclideanRemainder(int a, int b);
 int myPow(int x, int p);
+vector<double> snap(int dim, map<double,double>& mapCurve, double delta, pair<double,double> txAndTy);
 double calculateDistance(point *point1, point *point2);
 void initKNearest(int k, kNearest *list);
 void sortNearest(kNearest *list);
+
 #endif

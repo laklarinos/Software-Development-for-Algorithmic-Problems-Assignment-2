@@ -35,18 +35,26 @@ int main(int argc, char **argv)
 
     if (strcmp(algorithm, "LSH") == 0)
     {
-#ifndef LSH
-#define LSH
-#include "lsh/lsh.h"
-#endif
-
+        #ifndef LSH
+        #define LSH
+        #include "lsh/lsh.h"
+        #endif
         lshConstants lshCon;
         lshCon.k = k;
         lshCon.L = L;
         lshCon.w = 3;
-        if(strcmp(algorithm, "Frechet") == 0)
-            lsh(inputFile, queryFile, outputFile, lshCon, (char*)"yes", metric);
-        else
-            lsh(inputFile, queryFile, outputFile, lshCon,(char*)"no");
+        lsh(inputFile, queryFile, outputFile, lshCon, (char *)"no");
+    }
+    else if (strcmp(algorithm, "Frechet") == 0)
+    {
+        #ifndef LSH
+        #define LSH
+        #include "lsh/lsh.h"
+        #endif
+        lshConstants lshCon;
+        lshCon.k = k;
+        lshCon.L = L;
+        lshCon.w = 3;
+        lsh(inputFile, queryFile, outputFile, lshCon, (char*)"yes", metric, delta);
     }
 }

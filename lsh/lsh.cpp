@@ -3,7 +3,7 @@
 
 using namespace std;
 
-int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon, char *frechet, char *metric)
+int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon, char *frechet, char *metric, double delta)
 {
     int numOfLines;
     int numOfElements;
@@ -26,7 +26,6 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
     int res = parsInit(inputFile, arrayOfPoints, &numOfLines, &numOfElements);
     numOfDimensions = numOfElements - 1;
 
-    //return EXIT_SUCCESS;
     int numberOfNN = 5;
     int rad = 10;
 
@@ -42,49 +41,61 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
         exit(1);
     }
 
-    vector<hashTable *> hashTablesArray(L);
+    vector<hashTable *> arrayOfHashTables(L);
     for (int i = 0; i < L; i++)
     {
-        hashTablesArray[i] = new hashTable(numOfLines / 4, &lshCon, numOfDimensions);
-    }
-
-    for (int i = 0; i < numOfLines; i++)
-    {
-        for (int j = 0; j < L; j++)
-        {
-            hashTablesArray[j]->insert(&arrayOfPoints[i]);
-        }
-    }
-
-    vector<point> arrayOfQueryPoints;
-
-    res = parsInit(inputFile, arrayOfQueryPoints, &numOfLinesQ, &numOfElementsQ);
-    numOfDimensionsQ = numOfElementsQ - 1;
-
-    if (res == 1)
-    {
-        cout << "Error when ParInit\n";
-        exit(1);
-    }
-
-    if (arrayOfQueryPoints.empty())
-    {
-        cout << "ArrayOfQueryPoints is Empty\n";
-        exit(1);
+        arrayOfHashTables[i] = new hashTable(numOfLines / 4, &lshCon, numOfDimensions);
     }
 
     if (strcmp(frechet, "yes") == 0)
     {
         // grid
         // need to create curves...
-        vector<map<int, double>> arrayOfCurves(numOfLines);
+        vector<map<double, double>> arrayOfCurves(numOfLines);
+        vector<pair<double, double>> arrayOfTxAndTy(L);
+        std::default_random_engine generator;
+        std::uniform_real_distribution<double> distribution(0.0, delta);
+
+        // generate t's for grid
+        for (int i = 0; i < L; i++)
+        {
+            double tx = distribution(generator);
+            double ty = distribution(generator);
+            arrayOfTxAndTy[i] = pair<double, double>(tx, ty);
+        }
+
+        // initialize the curves, x 1 ... N (where N the number of Points a curve has)
         for (int i = 0; i < numOfLines; i++)
         {
-            point* curPoint = &arrayOfPoints[i];
-            for(int j = 0; j < numOfDimensions; j++)
+            point *curPoint = &arrayOfPoints[i];
+            for (int j = 0; j < numOfDimensions; j++)
             {
-                double dValue = curPoint->pVector[j];   
-                arrayOfCurves[i].insert(pair<int, double>(j, dValue));
+                double dValue = curPoint->pVector[j];
+                arrayOfCurves[i].insert(pair<int, double>(j + 1, dValue));
+            }
+        }
+
+        vector<vector<double>> arrayOfSnappedCurves(numOfLines);
+        for (int i = 0; i < numOfLines; i++)
+        {
+            for (int j = 0; j < L; j++)
+            {
+                // snaps the curves on the grid, deletes duplicates and returns a vector
+                vector<double> temp;
+                temp = snap(numOfDimensions, arrayOfCurves[i], delta, arrayOfTxAndTy[j]);
+
+                //  padding
+                int sizeOfVector = temp.size();
+                for (int i = sizeOfVector - 1; i < 2 * numOfDimensions; i++)
+                {
+                    temp.push_back(INT_MAX - 5000); // a number that does not exist in the data set
+                }
+                // in order to insert the curve in the hash table, we pass the modified curve "temp" 
+                // from the hash functions which will give us the bucket number. Then we insert the actual 
+                // curve.
+
+                // I need to create a curve class 
+                
             }
         }
     }
@@ -115,9 +126,9 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
     //     initKNearest(0, &(listR[i]));
     //     for (int j = 0; j < L; j++)
     //     {
-    //         hashTablesArray[j]->findKNeighbors(&(arrayOfQueryPoints[i]), &list[i]);
-    //         hashTablesArray[j]->findKNeighborsTrue(&(arrayOfQueryPoints[i]), &listTrue[i]);
-    //         hashTablesArray[j]->findNeighborsR(&(arrayOfQueryPoints[i]), &listR[i], rad);
+    //         arrayOfHashTables[j]->findKNeighbors(&(arrayOfQueryPoints[i]), &list[i]);
+    //         arrayOfHashTables[j]->findKNeighborsTrue(&(arrayOfQueryPoints[i]), &listTrue[i]);
+    //         arrayOfHashTables[j]->findNeighborsR(&(arrayOfQueryPoints[i]), &listR[i], rad);
     //     }
     //     outputFileStream << "Query: " << arrayOfQueryPoints[i].getKey() << endl;
     //     int tempId = -1;
@@ -157,7 +168,7 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
 
     for (int i = 0; i < L; i++)
     {
-        delete hashTablesArray[i];
+        delete arrayOfHashTables[i];
     }
     return 0;
 }
