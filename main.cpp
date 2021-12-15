@@ -1,11 +1,9 @@
-#include "helpers/checkCommandLine.h"
-#include "helpers/parsinginit.h"
+#include "helpers/helpers.h"
 #include "lsh/lsh.h"
+#include "hypercube/cube.h"
 
 int main(int argc, char **argv)
 {
-    cout << " DFGHJKL:\n";
-
     int res = checkCommandLineArguments(argc, argv);
     if (res != 0)
         return EXIT_FAILURE;
@@ -35,10 +33,6 @@ int main(int argc, char **argv)
 
     if (strcmp(algorithm, "LSH") == 0)
     {
-        #ifndef LSH
-        #define LSH
-        #include "lsh/lsh.h"
-        #endif
         lshConstants lshCon;
         lshCon.k = k;
         lshCon.L = L;
@@ -47,14 +41,21 @@ int main(int argc, char **argv)
     }
     else if (strcmp(algorithm, "Frechet") == 0)
     {
-        #ifndef LSH
-        #define LSH
-        #include "lsh/lsh.h"
-        #endif
+
         lshConstants lshCon;
         lshCon.k = k;
         lshCon.L = L;
         lshCon.w = 3;
-        lsh(inputFile, queryFile, outputFile, lshCon, (char*)"yes", metric, delta);
+        lsh(inputFile, queryFile, outputFile, lshCon, (char *)"yes", metric, delta);
+    }
+    else if (strcmp(algorithm, "Hypercube") == 0)
+    {
+        cubeConstants cubeCon;
+        cubeCon.k = k;
+        cubeCon.L = L;
+        cubeCon.w = 3;
+        cubeCon.probes = probes;
+        cubeCon.M = M;
+        cube(inputFile, queryFile, outputFile, cubeCon);
     }
 }

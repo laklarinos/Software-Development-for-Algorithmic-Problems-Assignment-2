@@ -22,9 +22,10 @@ int parsInit(char *inputFile, vector<point> &vecPoints, int *numLinesReturn, int
 
     int elementsPerLine = 0;
     string token;
-
+    int c = 0;
     while (getline(inputFilePtr, line))
     {
+        c++;
         numOfLines++;
         istringstream is(line);
         vector<int> vecInt{istream_iterator<int>{is},

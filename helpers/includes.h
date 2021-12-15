@@ -20,4 +20,6 @@
 #include <map>
 #include <time.h>
 #include <bitset>
+
+using namespace std;
 #endif
