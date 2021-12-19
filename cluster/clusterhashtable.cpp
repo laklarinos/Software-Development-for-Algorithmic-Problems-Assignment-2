@@ -1,5 +1,5 @@
-#include "hashtable.h"
-hashTable::hashTable(int size, lshConstants *lshCon, int numOfDimensions)
+#include "clusterhashtable.h"
+hashTableCluster::hashTableCluster(int size, lshConstants *lshCon, int numOfDimensions)
 {
     this->array.resize(size);
     this->size = size;
@@ -41,14 +41,14 @@ hashTable::hashTable(int size, lshConstants *lshCon, int numOfDimensions)
     }
 }
 
-int hashTable::insert(point *pGiven)
+int hashTableCluster::insert(point *pGiven)
 {
     int IDp = hashFunction(pGiven);
     int key = euclideanRemainder(IDp, this->size);
     // if(pGiven->pVector[0] == 1)
     //     cout << IDp << endl;
     list<linkedListNode *> listPtr;
-    linkedListNode *nodePtr = new linkedListNode(pGiven, pGiven->pVector[0], IDp);
+    linkedListNode *nodePtr = new linkedListNode(pGiven, IDp);
     listPtr.push_back(nodePtr);
     auto itPos = array.begin() + key;
     this->array[key].push_back(nodePtr);
@@ -61,9 +61,9 @@ int hashTable::insert(point *pGiven)
     // }
 }
 
-int hashTable::search(point *pGiven) {}
+int hashTableCluster::search(point *pGiven) {}
 
-int hashTable::hashFunction(point *pGiven)
+int hashTableCluster::hashFunction(point *pGiven)
 {
 
     // g(p) = ID(p) mod Table_Size
@@ -97,7 +97,7 @@ int hashTable::hashFunction(point *pGiven)
     return idP;
 }
 
-hashTable::~hashTable()
+hashTableCluster::~hashTableCluster()
 {
     for (int i = 0; i < this->size; i++)
     {
@@ -108,7 +108,7 @@ hashTable::~hashTable()
     }
 }
 
-void hashTable::print()
+void hashTableCluster::print()
 {
     for (int i = 0; i < this->size; i++)
     {
@@ -129,12 +129,12 @@ void hashTable::print()
     }
 }
 
-vector<list<linkedListNode *>> hashTable::getArray()
+vector<list<linkedListNode *>> hashTableCluster::getArray()
 {
     return this->array;
 }
 
-void hashTable::findKNeighbors(point *queryPoint, kNearest *nearestList)
+void hashTableCluster::findKNeighbors(point *queryPoint, kNearest *nearestList)
 {
     int IDp = hashFunction(queryPoint);
     int key = euclideanRemainder(IDp, this->size);
@@ -150,7 +150,7 @@ void hashTable::findKNeighbors(point *queryPoint, kNearest *nearestList)
         if (IDp == IDpNode)
         {
             point *curPoint = (*it)->getPVector();
-            double dist = calculateDistance(queryPoint, curPoint);
+            double dist = euclDistance(queryPoint, curPoint);
             if (dist < nearestList->dist[nearestList->size - 1] && dist > 0)
             {
                 counter++;
@@ -177,7 +177,7 @@ void hashTable::findKNeighbors(point *queryPoint, kNearest *nearestList)
             //if (IDp == IDpNode)
             //{
             point *curPoint = (*it)->getPVector();
-            double dist = calculateDistance(queryPoint, curPoint);
+            double dist = euclDistance(queryPoint, curPoint);
             if (dist < nearestList->dist[nearestList->size - 1] && dist > 0)
             {
                 counter++;
@@ -193,7 +193,7 @@ void hashTable::findKNeighbors(point *queryPoint, kNearest *nearestList)
     }
 }
 
-void hashTable::findKNeighborsTrue(point *queryPoint, kNearest *nearestList)
+void hashTableCluster::findKNeighborsTrue(point *queryPoint, kNearest *nearestList)
 {
     // int IDp = hashFunction(queryPoint);
     // int key = euclideanRemainder(IDp, this->size);
@@ -207,7 +207,7 @@ void hashTable::findKNeighborsTrue(point *queryPoint, kNearest *nearestList)
             int IDpNode = (*it)->getIDp();
 
             point *curPoint = (*it)->getPVector();
-            double dist = calculateDistance(queryPoint, curPoint);
+            double dist = euclDistance(queryPoint, curPoint);
             if (dist < nearestList->dist[nearestList->size - 1] && dist > 0)
             {
                 using sec = std::chrono::duration<double, std::micro>;
@@ -221,7 +221,7 @@ void hashTable::findKNeighborsTrue(point *queryPoint, kNearest *nearestList)
     }
 }
 
-void hashTable::findNeighborsR(point *queryPoint, kNearest *nearestList, int R)
+void hashTableCluster::findNeighborsR(point *queryPoint, kNearest *nearestList, int R)
 {
     int IDp = hashFunction(queryPoint);
     int key = euclideanRemainder(IDp, this->size);
@@ -245,7 +245,7 @@ void hashTable::findNeighborsR(point *queryPoint, kNearest *nearestList, int R)
         if (flag)
             continue;
 
-        double dist = calculateDistance(queryPoint, curPoint);
+        double dist = euclDistance(queryPoint, curPoint);
         if (dist < R)
         {
             nearestList->dist.push_back(dist);

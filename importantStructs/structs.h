@@ -2,6 +2,7 @@
 #define STR
 #include "../helpers/includes.h"
 #include "point.h"
+
 typedef struct kNearest
 {
     vector<point *> nearestPoints;
@@ -30,6 +31,6 @@ typedef struct cubeConstants
     int L;
     int k;
     int w;
-    
-}cubeConstants;
+
+} cubeConstants;
 #endif

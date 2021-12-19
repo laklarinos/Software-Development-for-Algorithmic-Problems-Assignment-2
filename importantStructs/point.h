@@ -12,6 +12,7 @@ private:
 
 public:
     std::vector<float> pVector;
+    vector<float> filteredCurve;
     string getKey();
     std::vector<float> *getVector();
     int getDimensions();

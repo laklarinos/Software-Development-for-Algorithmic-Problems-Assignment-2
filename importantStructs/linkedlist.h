@@ -1,5 +1,5 @@
-#ifndef LINKEDLIST
-#define LINKEDLIST
+#ifndef LINKED_LIST
+#define LINKED_LIST
 
 #include "../helpers/includes.h"
 #include "../importantStructs/point.h"
@@ -9,7 +9,6 @@ using namespace std;
 class linkedListNode
 {
 private:
-
    //int key;
    int IDp;
 

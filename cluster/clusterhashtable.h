@@ -1,9 +1,12 @@
 
-#ifndef HASH
-#define HASH
-#include "linkedlist.h"
+#ifndef HASH_CLUSTER
+#define HASH_CLUSTER
 
-class hashTable
+#include "../importantStructs/linkedlist.h"
+#include "../importantStructs/structs.h"
+#include "../helpers/helpers.h"
+
+class hashTableCluster
 {
 
 private:
@@ -24,10 +27,10 @@ public:
     int hashFunction(point *pGiven);
 
     // destructor, under construction (no pun intented)
-    ~hashTable();
+    ~hashTableCluster();
 
     // constructor
-    hashTable(int size, lshConstants *lshCon, int numOfDimensions);
+    hashTableCluster(int size, lshConstants *lshCon, int numOfDimensions);
 
     // returns the array as a whole...
     vector<list<linkedListNode *>> getArray();

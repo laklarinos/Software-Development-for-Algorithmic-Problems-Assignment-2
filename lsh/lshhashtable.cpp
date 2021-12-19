@@ -1,5 +1,5 @@
 #include "lshhashtable.h"
-hashTable::hashTable(int size, lshConstants *lshCon, int numOfDimensions, int frechet)
+hashTable::hashTable(int size, lshConstants *lshCon, int numOfDimensions, int frechet, int continuous)
 {
     this->array.resize(size);
     this->size = size;
@@ -23,7 +23,7 @@ hashTable::hashTable(int size, lshConstants *lshCon, int numOfDimensions, int fr
     this->vAndTVector.resize(lshCon->k);
     int sample;
 
-    if (frechet == 1)
+    if (frechet == 1 && continuous == 0)
         numOfDimensions = numOfDimensions * 2;
 
     for (int j = 0; j < lshCon->k; j++)
@@ -46,24 +46,13 @@ hashTable::hashTable(int size, lshConstants *lshCon, int numOfDimensions, int fr
 
 int hashTable::insert(point *pGiven)
 {
-
     int IDp = hashFunction(pGiven);
     int key = euclideanRemainder(IDp, this->size);
-    // if(pGiven->pVector[0] == 1)
-    //     cout << IDp << endl;
-
     list<linkedListNode *> listPtr;
     linkedListNode *nodePtr = new linkedListNode(pGiven, IDp);
     listPtr.push_back(nodePtr);
     auto itPos = array.begin() + key;
     this->array[key].push_back(nodePtr);
-    // if(this->array[key].empty()){
-    //     // empty list == first item...
-    //     this->array.insert(itPos, listPtr);
-    // }else{
-    //     // list is not empty
-    //     this->array[key].push_back(nodePtr);
-    // }
 }
 
 int hashTable::insert(point *pGiven, vector<float> vecToFindKey)
@@ -150,14 +139,23 @@ vector<list<linkedListNode *>> hashTable::getArray()
     return this->array;
 }
 
-void hashTable::findKNeighbors(point *queryPoint, kNearest *nearestList, vector<float> vecFloat)
+void hashTable::findKNeighbors(point *queryPoint, kNearest *nearestList, vector<float> vecFloat, int continuous)
 {
     int IDp;
     int key;
-    int frechet = 0;
-    if (vecFloat.empty() != 1)
+    int frechetDisc = 0;
+    int frechetCont = 0;
+
+    if (vecFloat.empty() != 1 && continuous == 1)
     {
-        frechet = 1;
+        frechetCont = 1;
+        point p(vecFloat);
+        IDp = hashFunction(&p);
+        key = euclideanRemainder(IDp, this->size);
+    }
+    else if (vecFloat.empty() != 1 && continuous == 0)
+    {
+        frechetDisc = 1;
         point p(vecFloat);
         IDp = hashFunction(&p);
         key = euclideanRemainder(IDp, this->size);
@@ -176,15 +174,23 @@ void hashTable::findKNeighbors(point *queryPoint, kNearest *nearestList, vector<
     for (it = this->array[key].begin(); it != this->array[key].end(); ++it)
     {
         int IDpNode = (*it)->getIDp();
+
         if (IDp == IDpNode)
         {
+            cout << "Calculatin distance...";
+
             point *curPoint = (*it)->getPVector();
             float dist;
-            if (frechet == 1)
+            if (frechetDisc == 1)
             {
                 dist = DFD(queryPoint->pVector, curPoint->pVector);
             }
-            else if (frechet == 0)
+            else if (frechetCont == 1)
+            {
+                dist = CFD(queryPoint->filteredCurve, curPoint->filteredCurve);
+                cout << dist << endl;
+            }
+            else if (frechetDisc == 0 && frechetCont == 0)
             {
                 dist = euclDistance(curPoint, queryPoint);
             }
@@ -201,7 +207,6 @@ void hashTable::findKNeighbors(point *queryPoint, kNearest *nearestList, vector<
             }
         }
     }
-
     if (counter < nearestList->dist.size())
     {
         // if we havent found K NN's
@@ -211,14 +216,22 @@ void hashTable::findKNeighbors(point *queryPoint, kNearest *nearestList, vector<
         for (it = this->array[key].begin(); it != this->array[key].end(); ++it)
         {
             int IDpNode = (*it)->getIDp();
-
-            //if (IDp == IDpNode)
-            //{
+            double dist;
             point *curPoint = (*it)->getPVector();
-            double dist = DFD(queryPoint->pVector, curPoint->pVector);
+            if (frechetDisc == 1)
+            {
+                dist = DFD(queryPoint->pVector, curPoint->pVector);
+            }
+            else if (frechetCont == 1)
+            {
+                dist = CFD(queryPoint->filteredCurve, curPoint->filteredCurve);
+            }
+            else if (frechetDisc == 0 && frechetCont == 0)
+            {
+                dist = euclDistance(curPoint, queryPoint);
+            }
             if (dist < nearestList->dist[nearestList->size - 1] && dist > 0)
             {
-                counter++;
                 using sec = std::chrono::duration<double, std::micro>;
                 sec end = clock::now() - begin;
                 nearestList->dist[nearestList->size - 1] = dist;
@@ -226,15 +239,36 @@ void hashTable::findKNeighbors(point *queryPoint, kNearest *nearestList, vector<
                 nearestList->vecOfTimes[nearestList->size - 1] = end;
                 sortNearest(nearestList);
             }
-            //}
         }
     }
 }
 
-void hashTable::findKNeighborsTrue(point *queryPoint, kNearest *nearestList, vector<float> vecFloat)
+void hashTable::findKNeighborsTrue(point *queryPoint, kNearest *nearestList, vector<float> vecFloat, int continuous)
 {
-    // int IDp = hashFunction(queryPoint);
-    // int key = euclideanRemainder(IDp, this->size);
+    int IDp;
+    int key;
+    int frechetDisc = 0;
+    int frechetCont = 0;
+    if (vecFloat.empty() != 1 && continuous == 1)
+    {
+        frechetCont = 1;
+        point p(vecFloat);
+        IDp = hashFunction(&p);
+        key = euclideanRemainder(IDp, this->size);
+    }
+    else if (vecFloat.empty() != 1 && continuous == 0)
+    {
+        frechetDisc = 1;
+        point p(vecFloat);
+        IDp = hashFunction(&p);
+        key = euclideanRemainder(IDp, this->size);
+    }
+    else
+    {
+        IDp = hashFunction(queryPoint);
+        key = euclideanRemainder(IDp, this->size);
+    }
+
     list<linkedListNode *>::iterator it;
     using clock = std::chrono::system_clock;
     auto begin = clock::now();
@@ -242,10 +276,25 @@ void hashTable::findKNeighborsTrue(point *queryPoint, kNearest *nearestList, vec
     {
         for (it = this->array[i].begin(); it != this->array[i].end(); ++it)
         {
+            cout << "Calculate distance...";
             int IDpNode = (*it)->getIDp();
-
             point *curPoint = (*it)->getPVector();
-            double dist = DFD(queryPoint->pVector, curPoint->pVector);
+            double dist;
+
+            if (frechetDisc == 1)
+            {
+                dist = DFD(queryPoint->pVector, curPoint->pVector);
+            }
+            else if (frechetCont == 1)
+            {
+                dist = CFD(queryPoint->filteredCurve, curPoint->filteredCurve);
+                cout << dist << endl;
+            }
+            else if (frechetDisc == 0 && frechetCont == 0)
+            {
+                dist = euclDistance(curPoint, queryPoint);
+            }
+
             if (dist < nearestList->dist[nearestList->size - 1] && dist > 0)
             {
                 using sec = std::chrono::duration<double, std::micro>;
@@ -259,7 +308,7 @@ void hashTable::findKNeighborsTrue(point *queryPoint, kNearest *nearestList, vec
     }
 }
 
-void hashTable::findNeighborsR(point *queryPoint, kNearest *nearestList, int R)
+void hashTable::findNeighborsR(point *queryPoint, kNearest *nearestList, int R, int frechet)
 {
     int IDp = hashFunction(queryPoint);
     int key = euclideanRemainder(IDp, this->size);
@@ -271,7 +320,13 @@ void hashTable::findNeighborsR(point *queryPoint, kNearest *nearestList, int R)
         //if (IDp == IDpNode)
         //{
         point *curPoint = (*it)->getPVector();
-        double dist = DFD(queryPoint->pVector, curPoint->pVector);
+            
+        double dist;
+        if(frechet == 1)
+            dist = DFD(queryPoint->pVector, curPoint->pVector);
+        if(frechet == 0)
+            dist = euclDistance(queryPoint, curPoint);
+            
         if (dist < R && dist > 0)
         {
             nearestList->dist.push_back(dist);

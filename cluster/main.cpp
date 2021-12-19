@@ -1,14 +1,21 @@
-#include "parsinginit.h"
+#include "../helpers/helpers.h"
+#include "checkcommandlinecluster.h"
 #include "cluster.h"
+
 using namespace std;
+
+// $./cluster –i <input file> –c <configuration file> -o <output file> -update <Mean
+// Frechet or Mean Vector> –assignment <Classic or LSH or Hypercube or LSH_Frechet>
+// -complete <optional> -silhouette <optional>
 
 int main(int argc, char *argv[])
 {
     char *inputFile;
     char *outputFile;
     char *confFile;
-    char *complete;
-    char *method;
+    char *assignment;
+    char *update;
+    char *silhouette;
 
     int kLSH;
     int kCUBE;
@@ -23,16 +30,15 @@ int main(int argc, char *argv[])
     int numOfElements;
     int numOfDimensions;
 
-    lshConstants lshCon;
-
     // for query file
     int numOfLinesQ;
     int numOfElementsQ;
     int numOfDimensionsQ;
 
-    int checkArgs = checkCommandLineArguments(argc, argv);
+    int checkArgs = checkCommandLineCluster(argc, argv);
     if (checkArgs)
     {
+        cout << "Problem with checking command line arguments\n";
         exit(1);
     }
 
@@ -40,8 +46,9 @@ int main(int argc, char *argv[])
     inputFile = argv[2];
     confFile = argv[4];
     outputFile = argv[6];
-    complete = argv[8];
-    method = argv[10];
+    update = argv[8];
+    assignment = argv[10];
+    silhouette = argv[12];
 
     //read conf file...
     vector<int> vecOfConfArgs;
@@ -84,30 +91,34 @@ int main(int argc, char *argv[])
     fstream outputFilePtr;
 
     vector<point> vecOfPoints;
+    vector<centroid> vecOfCentroids;
 
     int res = parsInit(inputFile, vecOfPoints, &numOfLines, &numOfElements);
     numOfDimensions = numOfElements - 1;
+
     if (res == 1)
     {
+        cout << "Problem when parsing the file\n";
         exit(1);
     }
 
     if (vecOfPoints.empty())
     {
+        cout << "Problem when parsing the file\n";
         exit(1);
     }
 
-    // first centroid randomly generated...
-    vector<centroid> vecOfCentroids;
+    initCentroids(vecOfCentroids, numOfClusters, vecOfPoints);
+    vector<curveMine> vecOfCurves;
 
     // K-MEANS ++, INITIALIZATION
     initCentroids(vecOfCentroids, numOfClusters, vecOfPoints);
+    
     // LLOYD, LSH REVERSE, HYPERCUBE REVERSE, ASSIGNMENT
 
-    if (strcmp(method, "Classic") == 0)
+    if (strcmp(assignment, "Classic") == 0)
     {
         // LLOYD
-
         vector<centroid> temp = vecOfCentroids;
         int maxIt = 100;
         int countIt = 1;
@@ -119,13 +130,19 @@ int main(int argc, char *argv[])
         while (countIt < maxIt && flag < numOfClusters)
         {
             flag = 0;
-            //cout << currMeanDistance << endl;
-            lloyd(vecOfCentroids, vecOfPoints);
+
+            if (strcmp(update, "Mean_Vector") == 0)
+                lloyd(vecOfCentroids, vecOfPoints);
+
+            if (strcmp(update, "Mean_Frechet") == 0)
+                lloyd(vecOfCentroids, vecOfPoints, 1);
+
             updateCentroids(vecOfCentroids, numOfClusters);
+
             float dist;
             for (int j = 0; j < numOfClusters; j++)
             {
-                dist = calculateDistance(temp[j].coordinates, vecOfCentroids[j].coordinates);
+                dist = euclDistance(temp[j].coordinates, vecOfCentroids[j].coordinates);
                 if (dist < 85)
                     flag++;
                 else
@@ -141,11 +158,13 @@ int main(int argc, char *argv[])
         ofstream outputFileStream;
         outputFileStream.open(outputFile);
         outputFileStream << "Algorithm: Range Search Classic\n";
-        printToFile(outputFileStream, vecOfCentroids, end, complete);
+        printToFile(outputFileStream, vecOfCentroids, end, silhouette);
     }
-    else if (strcmp(method, "LSH") == 0)
+    else if (strcmp(assignment, "LSH") == 0)
     {
         // LSH REVERSE
+        lshConstants lshCon;
+
         lshCon.k = kLSH;
         lshCon.w = w;
         lshCon.L = L;
@@ -175,14 +194,13 @@ int main(int argc, char *argv[])
         while (countIt < maxIt && flag < numOfClusters)
         {
             flag = 0;
-            //cout << currMeanDistance << endl;
             lshReverse(vecOfCentroids, vecOfPoints, vecOfHashTables);
             insertRestOfPoints(vecOfPoints, vecOfCentroids);
             updateCentroids(vecOfCentroids, numOfClusters);
             float dist;
             for (int j = 0; j < numOfClusters; j++)
             {
-                dist = calculateDistance(temp[j].coordinates, vecOfCentroids[j].coordinates);
+                dist = euclDistance(temp[j].coordinates, vecOfCentroids[j].coordinates);
                 if (dist < 85)
                     flag++;
                 else
@@ -191,7 +209,6 @@ int main(int argc, char *argv[])
             temp = vecOfCentroids;
             countIt++;
         }
-        // now let's check which items did not get assigned to any cluster...
 
         using sec = std::chrono::duration<double>;
         sec end = clock::now() - begin;
@@ -199,17 +216,22 @@ int main(int argc, char *argv[])
         ofstream outputFileStream;
         outputFileStream.open(outputFile);
         outputFileStream << "Algorithm: Range Search LSH\n";
-        printToFile(outputFileStream, vecOfCentroids, end, complete);
+        printToFile(outputFileStream, vecOfCentroids, end, silhouette);
     }
-    else if (strcmp(method, "HYPER") == 0)
+    else if (strcmp(assignment, "HYPER") == 0)
     {
         // HYPERCUBE REVERSE
-        lshCon.k = kCUBE;
-        lshCon.w = w;
-        lshCon.L = M;
-        hashTableCube *hashT = new hashTableCube(myPow(2, kCUBE), &lshCon, numOfDimensions);
+        cubeConstants cubCon;
+        cubCon.k = kCUBE;
+        cubCon.w = w;
+        cubCon.L = L;
+        cubCon.probes = probes;
+        cubCon.M = M;
+
+        hashTableCube *hashT = new hashTableCube(myPow(2, kCUBE), &cubCon, numOfDimensions);
         for (int i = 0; i < numOfLines; i++)
             hashT->insert(&vecOfPoints[i]);
+
         vector<centroid> temp = vecOfCentroids;
         int maxIt = 100;
         int countIt = 1;
@@ -221,8 +243,6 @@ int main(int argc, char *argv[])
         while (countIt < maxIt && flag < numOfClusters)
         {
             flag = 0;
-            //cout << currMeanDistance << endl;
-            //lshReverse(vecOfCentroids, vecOfPoints, vecOfHashTables);
             hyperCubeReverse(vecOfCentroids, vecOfPoints, hashT, probes, M);
             insertRestOfPoints(vecOfPoints, vecOfCentroids);
             updateCentroids(vecOfCentroids, numOfClusters);
@@ -230,7 +250,7 @@ int main(int argc, char *argv[])
 
             for (int j = 0; j < numOfClusters; j++)
             {
-                dist += calculateDistance(temp[j].coordinates, vecOfCentroids[j].coordinates);
+                dist += euclDistance(temp[j].coordinates, vecOfCentroids[j].coordinates);
                 if (dist < 85)
                     flag++;
                 else
@@ -238,7 +258,6 @@ int main(int argc, char *argv[])
             }
             temp = vecOfCentroids;
             countIt++;
-            cout << countIt << endl;
         }
 
         // now let's check which items did not get assigned to any cluster...
@@ -249,7 +268,7 @@ int main(int argc, char *argv[])
         ofstream outputFileStream;
         outputFileStream.open(outputFile);
         outputFileStream << "Algorithm: Range Search HYPER CUBE\n";
-        printToFile(outputFileStream, vecOfCentroids, end, complete);
+        printToFile(outputFileStream, vecOfCentroids, end, silhouette);
     }
 
     return 0;

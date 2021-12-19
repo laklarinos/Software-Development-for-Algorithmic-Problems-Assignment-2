@@ -404,7 +404,7 @@ void sortNearest(kNearest *list)
     }
 }
 
-vector<float> snap(int dim, map<float, float> &mapCurve, double delta, pair<float, float> txAndTy)
+vector<float> snap(int dim, vector<pair<float, float>> &mapCurve, double delta, pair<float, float> txAndTy)
 {
 
     // xi' = floor((x-t)/δ + 1/2)*δ + t
@@ -421,49 +421,79 @@ vector<float> snap(int dim, map<float, float> &mapCurve, double delta, pair<floa
     float xi;
     float yi;
 
-    vector<pair<float, float>> vecOfPairs;
-    for (int i = 0; i < sizeOfMap; i++)
+    if (dim == 2)
     {
-        std::map<float, float>::iterator it = mapCurve.begin();
-        advance(it, i);
-
-        xi = it->first;
-        yi = it->second;
-
-        xiNew = abs(floor((xi - tx) / delta + 1 / 2) * delta + tx);
-        yiNew = abs(floor((yi - ty) / delta + 1 / 2) * delta + ty);
-        vecOfPairs.push_back(pair<float, float>(xiNew, yiNew));
-    }
-
-    // eliminate duplications...
-    pair<float, float> tempPair = vecOfPairs[0];
-    for (int i = 1; i < sizeOfMap; i++)
-    {
-        pair<float, float> currPair = vecOfPairs[i];
-        if (tempPair.first == currPair.first && tempPair.second == currPair.second)
+        vector<pair<float, float>> vecOfPairs;
+        for (int i = 0; i < sizeOfMap; i++)
         {
-            auto it = vecOfPairs.begin() + i;
-            vecOfPairs[i].first = 0;
-            vecOfPairs[i].second = 0;
+            xi = mapCurve[i].first;
+            yi = mapCurve[i].second;
+
+            xiNew = abs(floor((xi - tx) / delta + 1 / 2) * delta + tx);
+            yiNew = abs(floor((yi - ty) / delta + 1 / 2) * delta + ty);
+            vecOfPairs.push_back(pair<float, float>(xiNew, yiNew));
         }
-        else
+
+        // eliminate duplications...
+        pair<float, float> tempPair = vecOfPairs[0];
+        for (int i = 1; i < sizeOfMap; i++)
         {
-            tempPair = currPair;
+            pair<float, float> currPair = vecOfPairs[i];
+            if (tempPair.first == currPair.first && tempPair.second == currPair.second)
+            {
+                vecOfPairs[i].first = -1;
+                vecOfPairs[i].second = -1;
+            }
+            else
+            {
+                tempPair = currPair;
+            }
         }
+
+        vecOfPairs.erase(std::remove(vecOfPairs.begin(), vecOfPairs.end(), pair<float, float>(-1, -1)), vecOfPairs.end()); //erase remove technique
+
+        vector<float> vecToReturn;
+
+        for (int i = 0; i < sizeOfMap; i++)
+        {
+            vecToReturn.push_back(vecOfPairs[i].first);
+            vecToReturn.push_back(vecOfPairs[i].second);
+        }
+        return vecToReturn;
     }
-
-    vecOfPairs.erase(std::remove(vecOfPairs.begin(), vecOfPairs.end(), pair<float, float>(0, 0)), vecOfPairs.end()); //erase remove technique
-
-    vector<float> vecToReturn;
-    sizeOfMap = vecOfPairs.size();
-
-    for (int i = 0; i < sizeOfMap; i++)
+    else if (dim == 1)
     {
-        auto it = vecOfPairs.begin() + i;
-        vecToReturn.push_back(it->first);
-        vecToReturn.push_back(it->second);
+        float epsilon = 1.5;
+        vector<float> vecOfPairs;
+
+        for (int i = 0; i < sizeOfMap; i++)
+        {
+            yi = mapCurve[i].second;
+            yiNew = abs(floor((yi - ty) / delta + 1 / 2) * delta + ty);
+            vecOfPairs.push_back(yiNew);
+        }
+
+        // minima maxima
+        for (int i = 0; i < sizeOfMap - 3; i++)
+        {
+            // if |a − b| ≤ e and |b − c| ≤ e
+            if (vecOfPairs[i] <= vecOfPairs[i + 1] && vecOfPairs[i + 1] <= vecOfPairs[i + 2] || vecOfPairs[i] >= vecOfPairs[i + 1] && vecOfPairs[i + 1] >= vecOfPairs[i + 2])
+            {
+                i += 2;
+                vecOfPairs[i + 1] = -1;
+            }
+        }
+        vecOfPairs.erase(std::remove(vecOfPairs.begin(), vecOfPairs.end(), -1), vecOfPairs.end()); //erase remove technique
+
+        vector<float> vecToReturn;
+        sizeOfMap = vecOfPairs.size();
+
+        for (int i = 0; i < sizeOfMap; i++)
+        {
+            vecToReturn.push_back(vecOfPairs[i]);
+        }
+        return vecToReturn;
     }
-    return vecToReturn;
 }
 
 float DFD(vector<float> curve1, vector<float> curve2)
@@ -510,8 +540,144 @@ float DFD(vector<float> curve1, vector<float> curve2)
     return completeArray[sizeOfCurve1 - 1][sizeOfCurve2 - 1];
 }
 
+float CFD(vector<float> curve1, vector<float> curve2)
+{
+    // first we need to create 2 repository curves out of our 2 curves...
+    Curve curveRepo1 = toRepoCurve(curve1);
+    Curve curveRepo2 = toRepoCurve(curve2);
+
+    Frechet::Continuous::Distance d = Frechet::Continuous::distance(curveRepo1, curveRepo2);
+    return d.value;
+}
+
+Curve toRepoCurve(vector<float> myCurve)
+{
+    Curve c(myCurve.size(), 1, "randy");
+    for (float k : myCurve)
+    {
+        // cout << "k is " << k << endl;
+        Point p(1);
+        p[0] = k;
+        c.push_back(p);
+    }
+
+    return c;
+}
+
 float euclDistanceOf2Points(float x1, float x2, float y1, float y2)
 {
     float res = ((x1 - x2) * (x1 - x2)) + ((y1 - y2) * (y1 - y2));
     return sqrt(res);
+}
+
+void printToFile(char *outputFile, char *algorithm, vector<kNearest> &list,
+                 vector<kNearest> &listTrue, vector<hashTable *> &arrayOfHashTables,
+                 int numberOfNN, vector<point> &arrayOfCurves1DQ,
+                 vector<vector<vector<float>>> const &arrayOfCurves1DQSnapped)
+{
+    float MAF = -1;
+    float averageAppDist = 0.0;
+    float averageTruDist = 0.0;
+    int c = 0;
+    int numOfLinesQ = arrayOfCurves1DQ.size();
+
+    ofstream outputFileStream;
+    int L = arrayOfHashTables.size();
+    outputFileStream.open(outputFile, std::ios_base::app);
+
+    for (int i = 0; i < numOfLinesQ; i++)
+    {
+        int flag = 0;
+        initKNearest(numberOfNN, &(list[i]));
+        initKNearest(numberOfNN, &(listTrue[i]));
+
+        for (int j = 0; j < L; j++)
+        {
+            if (strcmp(algorithm, "LSH_Algorithm") == 0)
+            {
+                arrayOfHashTables[j]->findKNeighbors(&arrayOfCurves1DQ[i], &list[i]);
+                arrayOfHashTables[j]->findKNeighborsTrue(&arrayOfCurves1DQ[i], &listTrue[i]);
+            }
+            else if (strcmp(algorithm, "LSH_Frechet_Discrete") == 0)
+            {
+                point temPoint(arrayOfCurves1DQSnapped[i][j]);
+                arrayOfHashTables[j]->findKNeighbors(&arrayOfCurves1DQ[i], &list[i], arrayOfCurves1DQSnapped[i][j]);
+                arrayOfHashTables[j]->findKNeighborsTrue(&arrayOfCurves1DQ[i], &listTrue[i], arrayOfCurves1DQSnapped[i][j]);
+            }
+            else if (strcmp(algorithm, "LSH_Frechet_Continuous") == 0)
+            {
+                point temPoint(arrayOfCurves1DQSnapped[i][j]);
+                arrayOfHashTables[j]->findKNeighbors(&arrayOfCurves1DQ[i], &list[i], arrayOfCurves1DQSnapped[i][j], 1);
+                arrayOfHashTables[j]->findKNeighborsTrue(&arrayOfCurves1DQ[i], &listTrue[i], arrayOfCurves1DQSnapped[i][j], 1);
+            }
+        }
+
+        outputFileStream << "Query: " << arrayOfCurves1DQ[i].getKey() << endl;
+        outputFileStream << "Algorithm: " << algorithm << endl;
+        int tempId = -1;
+
+        for (int z = 0; z < list[i].size; z++)
+        {
+            if (list[i].dist[z] != MAXFLOAT)
+            {
+                // we have a neighbor
+                outputFileStream << "Approximate nearest neighbor"
+                                 << ": " << list[i].nearestPoints[z]->getKey() << endl;
+                outputFileStream << "Approximate distance: " << list[i].dist[z] << endl;
+
+                if (listTrue[i].dist[z] != MAXFLOAT)
+                {
+                    // we have a neighbor
+                    float temp = list[i].dist[z] / listTrue[i].dist[z];
+                    if (temp > MAF)
+                    {
+                        MAF = temp;
+                    }
+                    flag = 1;
+                    outputFileStream << "Approximate true neighbor"
+                                     << ": " << listTrue[i].nearestPoints[z]->getKey() << endl;
+                    outputFileStream << "True distance: " << listTrue[i].dist[z] << endl;
+                }
+                c++;
+                averageAppDist += list[i].vecOfTimes[z].count();
+                averageTruDist += listTrue[i].vecOfTimes[z].count();
+                // outputFileStream << "   tLSH: " << list[i].vecOfTimes[z].count() << " ms" << endl;
+                // //if (flag)
+                // outputFileStream << "   tTrue: " << listTrue[i].vecOfTimes[z].count() << " ms" << endl
+                //                  << endl;
+            }
+        }
+        outputFileStream << "\n////////////////////////////////////////////////////////////\n";
+    }
+    if (c != 0)
+    {
+        outputFileStream << "tApproximateAverage: " << averageAppDist / c << " ms" << endl;
+        outputFileStream << "tTrueAverage: " << averageTruDist / c << " ms" << endl;
+    }
+    outputFileStream << "MAF: <double> " << MAF << endl;
+}
+
+vector<float> meanCurve(vector<vector<float>> &vecOfCurves)
+{
+    int sizeOfVector = vecOfCurves.size();
+    if(sizeOfVector == 1) return vecOfCurves[0];
+    vector<vector<float>> temp;
+    int i;
+    for (i = 0; i < sizeOfVector - 1; i++)
+    {
+        temp.push_back(meanFrechet(vecOfCurves[i], vecOfCurves[i + 1]));
+        i += 2;
+    }
+
+    if (sizeOfVector - i == 2)
+    {
+        temp.push_back(vecOfCurves[sizeOfVector - 1]);
+    }
+    
+    return meanCurve(temp);
+}
+
+vector<float> meanFrechet(vector<float> &curve1, vector<float> &curve2)
+{
+    
 }

@@ -1,60 +1,116 @@
-CC = g++ -g -O2 -std=c++11 
+CC = g++ -g -O2 -std=c++14 
+HEL = ../helpers/
+IMP = ../importantStructs/
+LSH = ../lsh/
+CUB = ../hypercube/
+FRE = ../Fred-master/src/
+PREVDIR = ../
 
-cluster: main.o parsinginit.o hashtable.o hashtablehyper.o linkedlist.o others.o cluster.o
+clusterprog: main.o cluster.o checkcommandlinecluster.o helpers.o lshhashtable.o cubehashtable.o point.o linkedlist.o frechet.o config.o pointRepo.o interval.o simplification.o curve.o curveMine.o
+	
+	$(CC) -o clusterprog main.o cluster.o checkcommandlinecluster.o helpers.o lshhashtable.o cubehashtable.o point.o linkedlist.o frechet.o config.o pointRepo.o interval.o simplification.o curve.o curveMine.o
 
-	$(CC) -o cluster main.o parsinginit.o hashtable.o hashtablehyper.o linkedlist.o others.o cluster.o
+cluster: cluster.o clusterhashtable.o helpers.o lshhashTable.o cubehashTable.o
 
-cluster.o: cluster.cpp hashtable.cpp hashtablehyper.cpp
+	$(CC) -o cluster.o lshhashtable.o helpers.o lshhashTable.o cubehashTable.o
 
-	$(CC) -c cluster.cpp hashtable.cpp hashtablehyper.cpp
+cluster.o: cluster.cpp clusterhashtable.cpp $(IMP)linkedlist.cpp $(HEL)helpers.cpp $(CUB)cubehashtable.cpp $(LSH)lshhashTable.cpp
 
-main.o: main.cpp others.cpp parsingInit.cpp hashtable.cpp hashtablehyper.cpp
+	$(CC) -c cluster.cpp clusterhashtable.cpp $(IMP)linkedlist.cpp $(HEL)helpers.cpp $(CUB)cubehashtable.cpp $(LSH)lshhashTable.cpp
 
-	$(CC) -c main.cpp others.cpp parsingInit.cpp hashtable.cpp hashtablehyper.cpp
+######## MAIN #######
+main.o: main.cpp checkcommandlinecluster.cpp cluster.cpp $(HEL)helpers.cpp $(LSH)lshhashtable.cpp $(CUB)cubehashtable.cpp $(IMP)point.cpp $(IMP)linkedlist.cpp 
 
-others.o: others.cpp
+	$(CC) -c main.cpp checkcommandlinecluster.cpp cluster.cpp $(HEL)helpers.cpp $(LSH)lshhashtable.cpp $(CUB)cubehashtable.cpp $(IMP)point.cpp $(IMP)linkedlist.cpp
+#####################
 
-	$(CC) -c others.cpp
+######## FOR FILES lsh ########
+lshhashtable.o: $(LSH)lshhashtable.cpp $(IMP)linkedlist.cpp $(HEL)helpers.cpp $(IMP)point.cpp
 
-parsinginit.o: parsingInit.cpp others.cpp
+	$(CC) -c $(LSH)lshhashtable.cpp $(IMP)linkedlist.cpp $(HEL)helpers.cpp $(IMP)point.cpp
+################################
 
-	$(CC) -c parsingInit.cpp others.cpp
 
-hashtable.o: hashtable.cpp others.cpp linkedlist.cpp 
+######## FOR FILES hypercube ######## 
+cubehashtable.o: $(CUB)cubehashtable.cpp $(IMP)linkedlist.cpp
 
-	$(CC) -c hashtable.cpp others.cpp linkedlist.cpp
+	$(CC) -c $(CUB)cubehashtable.cpp $(IMP)linkedlist.cpp
+#################################
 
-hashtablehyper.o: hashtablehyper.cpp others.cpp linkedlist.cpp 
+######## FOR FILES hypercube ######## 
+clusterhashtable.o: clusterhashtable.cpp $(IMP)linkedlist.cpp
 
-	$(CC) -c hashtablecube.cpp others.cpp linkedlist.cpp
+	$(CC) -c clusterhashtable.cpp $(IMP)linkedlist.cpp
+#################################
 
-linkedlist.o: linkedlist.cpp others.cpp
 
-	$(CC) -c linkedlist.cpp others.cpp
+###### FRECHET ######
+frechet: frechet.o config.o curve.o interval.o pointRepo.o simplification.o
+
+	$(CC) -o frechet frechet.o config.o curve.o interval.o pointRepo.o simplification.o
+
+frechet.o:	$(FRE)frechet.cpp $(FRE)config.cpp $(FRE)curve.cpp $(FRE)interval.cpp $(FRE)pointRepo.cpp $(FRE)simplification.cpp
+
+	$(CC) -c $(FRE)frechet.cpp $(FRE)config.cpp $(FRE)curve.cpp $(FRE)interval.cpp $(FRE)pointRepo.cpp $(FRE)simplification.cpp
+################################
+
+###### FOR important structs FILES ######
+point.o: $(IMP)point.cpp
+
+	$(CC) -c $(IMP)point.cpp
+
+linkedlist.o: $(IMP)linkedlist.cpp
+
+	$(CC) -c $(IMP)linkedlist.cpp
+
+helpers: helpers.o frechet.o
+
+	$(CC) -o helpers helpers.o frechet.o
+
+helpers.o: $(HEL)helpers.cpp $(IMP)point.cpp $(LSH)lshhashTable.cpp
+
+	$(CC) -c $(HEL)helpers.cpp $(IMP)point.cpp $(LSH)lshhashTable.cpp
+
+curveMine.o: $(IMP)curveMine.cpp 
+
+	$(CC) -c $(IMP)curveMine.cpp
+##########################################
+
+# $./cluster –i <input file> –c <configuration file> -o <output file> -update <Mean
+# Frechet or Mean Vector> –assignment <Classic or LSH or Hypercube or LSH_Frechet>
+# -complete <optional> -silhouette <optional>
 
 run:
 
-	./cluster –i input_small_id –c cluster.conf -o output.txt -Complete yes -m HYPER
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Frechet -assignment Classic -silhouette no
 
 runlsh:
 
-	./cluster –i input_small_id –c cluster.conf -o output.txt -Complete yes -m LSH
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Vector -assignment LSH
 
 runhyper:
 
-	./cluster –i input_small_id –c cluster.conf -o output.txt -Complete yes -m HYPER
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Vector -assignment Hypercube
 
 runclassic:
 
-	./cluster –i input_small_id –c cluster.conf -o output.txt -Complete yes -m Classic
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Vector -assignment Classic
+
+runlshfrechet:
+
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Frechet -assignment LSH
+
+runclassicfrechet:
+
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Frechet -assignment Classic
 
 valgrind:
 
-	valgrind --leak-check=yes ./cluster –i input_small_id –c cluster.conf -o output.txt -Complete yes -m HYPER
+	valgrind --leak-check=yes ./clusterprog –i $(PREVDIR)input_small_id –c cluster.conf -o $(PREVDIR)output.txt -Complete yes -m HYPER
 
 clean: 
 
-	rm -f *.o
+	rm -f *.o clusterprog
 
 	
 	

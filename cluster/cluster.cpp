@@ -7,16 +7,16 @@ centroid::centroid(point *coordinates)
 
 void centroid::includePoint(point *pGiven)
 {
-    this->culsterPoints.push_back(pGiven);
+    this->clusterPoints.push_back(pGiven);
 }
 
 void updateCentroids(vector<centroid> &vecOfCentroids, int numOfClusters)
 {
-    vector<int> medVector;
+    vector<float> medVector;
     for (int i = 0; i < numOfClusters; i++)
     {
         centroid curCentroid = vecOfCentroids[i];
-        vector<point *> vecOfClusterPoints = curCentroid.culsterPoints;
+        vector<point *> vecOfClusterPoints = curCentroid.clusterPoints;
         int sizeOfCluster = vecOfClusterPoints.size();
         int centroidCoordinates = curCentroid.coordinates->pVector.size();
         int sum;
@@ -42,19 +42,60 @@ void updateCentroids(vector<centroid> &vecOfCentroids, int numOfClusters)
     }
 }
 
-void initCentroids(vector<centroid> &vecOfCentroids, int numOfClusters, vector<point> &vecOfPoints)
+void updateCentroidsCurve(vector<centroid> &vecOfCentroids, int numOfClusters)
 {
+    vector<float> medVector;
+    for (int i = 0; i < numOfClusters; i++)
+    {
+        centroid curCentroid = vecOfCentroids[i];
+        vector<point *> vecOfClusterPoints = curCentroid.clusterPoints;
+        int sizeOfCluster = vecOfClusterPoints.size();
+        int centroidCoordinates = curCentroid.coordinates->pVector.size();
+        int sum;
+        medVector.push_back(0);
+
+        vector<vector<float>> vecOfArraysOfClusterPoints;
+        for (int j = 0; j < sizeOfCluster; j++)
+        {
+            vecOfArraysOfClusterPoints.push_back(vecOfClusterPoints[j]->pVector);
+        }
+
+        // for (int j = 1; j < centroidCoordinates; j++)
+        // {
+        //     sum = 0;
+        //     for (int z = 0; z < sizeOfCluster; z++)
+        //     {
+        //         sum = vecOfClusterPoints[z]->pVector[j] + sum;
+        //     }
+        //     medVector.push_back(sum);
+        // }
+
+        // if (sizeOfCluster != 0)
+        //     for (int k = 0; k < centroidCoordinates; k++)
+        //     {
+        //         medVector[k] = medVector[k] / (sizeOfCluster);
+        //     }
+
+        point *pt = new point(medVector);
+        vecOfCentroids[i].coordinates = pt;
+        medVector.clear();
+    }
+}
+
+void initCentroids(vector<centroid> &vecOfCentroids, int numOfClusters, vector<point> &vecOfPoints, int frechet)
+{
+    // kmeans ++
     std::random_device rd1;
     std::mt19937 gen1(rd1());
     std::uniform_int_distribution<int> uniDis(0, vecOfPoints.size() - 1);
 
-    int numOfDimensions = vecOfPoints[0].pVector.size() - 1;
-    int numOfLines = vecOfPoints.size();
-    vector<int> tempInt = vecOfPoints[uniDis(gen1)].pVector;
+    int numOfPairsInPoint = vecOfPoints[0].pVector.size() - 1;
+    int numOfPoints = vecOfPoints.size();
+    vector<float> tempInt = vecOfPoints[uniDis(gen1)].pVector;
     point *pt = new point(tempInt);
-    pt->pVector[0] = 0;
     vecOfCentroids.push_back(centroid(pt));
-    for (int t = 1; t < numOfClusters; t++)
+
+    for (int i = 1; i < numOfClusters; i++)
     {
         vector<float> vecOfSums;
         vector<float> vecOfDistances;
@@ -63,15 +104,25 @@ void initCentroids(vector<centroid> &vecOfCentroids, int numOfClusters, vector<p
         float min = MAXFLOAT;
         float max = -1;
         float dist;
-        for (int i = 0; i < vecOfPoints.size(); i++)
+        int numOfPointsInCluster = vecOfPoints.size();
+
+        for (int i = 0; i < numOfPointsInCluster; i++)
         {
-            vector<int> tempInt = vecOfPoints[i].pVector;
+            vector<float> tempInt = vecOfPoints[i].pVector;
             point *curPoint = new point(tempInt);
-            curPoint->pVector[0] = 0;
-            for (int j = 0; j < t; j++)
+
+            for (int j = 0; j < i; j++)
             {
                 point *centroidPoint = vecOfCentroids[j].coordinates;
-                dist = calculateDistance(curPoint, centroidPoint);
+                if (frechet == 0)
+                {
+                    dist = euclDistance(curPoint, centroidPoint);
+                }
+                else if (frechet == 1)
+                {
+                    dist = DFD(curPoint->pVector, centroidPoint->pVector);
+                }
+
                 if (dist > 0)
                 {
                     if (dist < min)
@@ -88,29 +139,22 @@ void initCentroids(vector<centroid> &vecOfCentroids, int numOfClusters, vector<p
             delete curPoint;
         }
 
-        for (int i = 0; i < vecOfDistances.size(); i++)
+        for (int z = 0; z < vecOfDistances.size(); z++)
         {
-            vecOfDistances.at(i) = sqrt(vecOfDistances[i] / max);
+            vecOfDistances.at(i) = sqrt(vecOfDistances[z] / max);
         }
 
-        int i;
+        int t;
         float sum = 0;
         vecOfProb.push_back(0);
-        for (i = 0; i < vecOfDistances.size(); i++)
+        for (t = 0; t < vecOfDistances.size(); t++)
         {
-            sum = sum + vecOfDistances[i];
-            
-            // float sum = 0;
-            // for (int j = 0; j <= i; j++)
-            // {
-            //     sum = sum + vecOfDistances[j];
-            // }
+            sum = sum + vecOfDistances[t];
             vecOfSums.push_back(sum);
             if (sum != 0)
-                vecOfProb.push_back(vecOfDistances[i] / sum);
+                vecOfProb.push_back(vecOfDistances[t] / sum);
             else
                 vecOfProb.push_back(0);
-
         }
 
         std::random_device rd;
@@ -118,12 +162,12 @@ void initCentroids(vector<centroid> &vecOfCentroids, int numOfClusters, vector<p
         std::uniform_real_distribution<float> uniDis(0, vecOfSums.back());
 
         float cumulativeProbability = 0.0;
-        for (int i = 0; i < vecOfDistances.size(); i++)
+        for (t = 0; t < vecOfDistances.size(); t++)
         {
-            cumulativeProbability += vecOfProb[i];
+            cumulativeProbability += vecOfProb[t];
             if (cumulativeProbability >= uniDis(gen))
             {
-                point *pt = new point(vecOfPoints[i].pVector);
+                point *pt = new point(vecOfPoints[t].pVector);
                 pt->pVector[0] = 0;
                 vecOfCentroids.push_back(pt);
                 break;
@@ -141,13 +185,16 @@ void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, ve
     vector<kNearest> list(sizeOfVecOfCentroids);
     vector<map<int, double>> vecOfMaps(sizeOfVecOfCentroids);
     float min = MAXFLOAT;
+
     for (int i = 0; i < sizeOfVecOfCentroids; i++)
     {
         for (int j = 0; j < sizeOfVecOfCentroids; j++)
         {
             if (i == j)
                 continue;
-            float dist = calculateDistance(vecOfCentroids[i].coordinates, vecOfCentroids[j].coordinates);
+            float dist;
+            dist = euclDistance(vecOfCentroids[i].coordinates, vecOfCentroids[j].coordinates);
+
             if (dist < min)
             {
                 min = dist;
@@ -252,7 +299,7 @@ void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, ve
 
     for (int i = 0; i < sizeOfVecOfCentroids; i++)
     {
-        vecOfCentroids[i].culsterPoints = list[i].nearestPoints;
+        vecOfCentroids[i].clusterPoints = list[i].nearestPoints;
         vecOfCentroids[i].initMap(i);
     }
 }
@@ -262,21 +309,21 @@ void centroid::initMap(int clusterId)
     if (this->mapOfAssignedItems.empty() == 0)
     {
         this->mapOfAssignedItems.clear();
-        int sizeOfVecOfPoints = this->culsterPoints.size();
+        int sizeOfVecOfPoints = this->clusterPoints.size();
 
         for (int i = 0; i < sizeOfVecOfPoints; i++)
         {
-            point *pt = this->culsterPoints[i];
+            point *pt = this->clusterPoints[i];
             this->mapOfAssignedItems.insert(pair<int, int>(pt->pVector[0], clusterId));
         }
     }
     else
     {
-        int sizeOfVecOfPoints = this->culsterPoints.size();
+        int sizeOfVecOfPoints = this->clusterPoints.size();
 
         for (int i = 0; i < sizeOfVecOfPoints; i++)
         {
-            point *pt = this->culsterPoints[i];
+            point *pt = this->clusterPoints[i];
             this->mapOfAssignedItems.insert(pair<int, int>(pt->pVector[0], clusterId));
         }
     }
@@ -306,19 +353,19 @@ void insertRestOfPoints(vector<point> &vecOfPoints, vector<centroid> &vecOfCentr
         int cent;
         for (int j = 0; j < numOfCentroids; j++)
         {
-            float dist = calculateDistance(pt, vecOfCentroids[j].coordinates);
+            float dist = euclDistance(pt, vecOfCentroids[j].coordinates);
             if (dist < min)
             {
                 min = dist;
                 cent = j;
             }
         }
-        vecOfCentroids[cent].culsterPoints.push_back(pt);
+        vecOfCentroids[cent].clusterPoints.push_back(pt);
         vecOfCentroids[cent].mapOfAssignedItems.insert(pair<int, int>(idPoint, cent));
     }
 }
 
-void printToFile(ofstream &outputFileStream, vector<centroid> &vecOfCentroids, chrono::duration<double> sec, char *complete)
+void printToFile(ofstream &outputFileStream, vector<centroid> &vecOfCentroids, chrono::duration<double> sec, char *silh)
 {
     //     CLUSTER-1 {size: <int>, centroid: πίνακας με τις συντεταγμένες του centroid}
     // . . . . . . .
@@ -328,7 +375,7 @@ void printToFile(ofstream &outputFileStream, vector<centroid> &vecOfCentroids, c
 
     for (int i = 0; i < numOfClusters; i++)
     {
-        int sizeOfCluster = vecOfCentroids[i].culsterPoints.size();
+        int sizeOfCluster = vecOfCentroids[i].clusterPoints.size();
         int sizeOfCoordinatesVector = vecOfCentroids[i].coordinates->pVector.size();
         outputFileStream << " CLUSTER-" << i + 1 << "{size:" << sizeOfCluster << ", centroid: ";
         for (int j = 1; j < sizeOfCoordinatesVector; j++)
@@ -340,19 +387,20 @@ void printToFile(ofstream &outputFileStream, vector<centroid> &vecOfCentroids, c
     }
     outputFileStream << "Clustering_time: " << sec.count() << " s" << endl
                      << endl;
-    silhouette(vecOfCentroids, outputFileStream);
-    if (strcmp(complete, "yes") == 0)
+
+    if (strcmp(silh, "yes") == 0)
     {
-        for (int i = 0; i < numOfClusters; i++)
+        silhouette(vecOfCentroids, outputFileStream);
+    }
+    for (int i = 0; i < numOfClusters; i++)
+    {
+        int sizeOfCluster = vecOfCentroids[i].clusterPoints.size();
+        outputFileStream << " CLUSTER-" << i + 1 << ", centroid: ";
+        for (int j = 0; j < sizeOfCluster; j++)
         {
-            int sizeOfCluster = vecOfCentroids[i].culsterPoints.size();
-            outputFileStream << " CLUSTER-" << i + 1 << ", centroid: ";
-            for (int j = 0; j < sizeOfCluster; j++)
-            {
-                outputFileStream << "item_id_" << j + 1 << ": " << vecOfCentroids[i].culsterPoints[j]->pVector[0] << ", ";
-            }
-            outputFileStream << endl;
+            outputFileStream << "item_id_" << j + 1 << ": " << vecOfCentroids[i].clusterPoints[j]->pVector[0] << ", ";
         }
+        outputFileStream << endl;
     }
 }
 
@@ -370,7 +418,7 @@ void hyperCubeReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoin
         {
             if (i == j)
                 continue;
-            float dist = calculateDistance(vecOfCentroids[i].coordinates, vecOfCentroids[j].coordinates);
+            float dist = euclDistance(vecOfCentroids[i].coordinates, vecOfCentroids[j].coordinates);
             if (dist < min)
             {
                 min = dist;
@@ -471,20 +519,20 @@ void hyperCubeReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoin
 
     for (int i = 0; i < sizeOfVecOfCentroids; i++)
     {
-        vecOfCentroids[i].culsterPoints = list[i].nearestPoints;
+        vecOfCentroids[i].clusterPoints = list[i].nearestPoints;
         vecOfCentroids[i].initMap(i);
     }
 }
 
-void lloyd(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints)
+void lloyd(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, int frechet)
 {
     int sizeOfVecOfCentroids = vecOfCentroids.size();
     int sizeOfVecOfPoints = vecOfPoints.size();
     for (int i = 0; i < sizeOfVecOfCentroids; i++)
     {
-        if (vecOfCentroids[i].culsterPoints.empty() == 0)
+        if (vecOfCentroids[i].clusterPoints.empty() == 0)
         {
-            vecOfCentroids[i].culsterPoints.clear();
+            vecOfCentroids[i].clusterPoints.clear();
         }
     }
 
@@ -497,20 +545,22 @@ void lloyd(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints)
         {
             centroid *currCentroid = &vecOfCentroids[j];
             point *currCentroidCoo = currCentroid->coordinates;
-            float dist = calculateDistance(currCentroidCoo, currPoint);
+
+            float dist;
+            if (frechet == 0)
+                dist = euclDistance(currCentroidCoo, currPoint);
+
+            if (frechet == 1)
+                dist = DFD(currCentroidCoo->pVector, currPoint->pVector);
+
             if (dist < min && dist > 0)
             {
                 min = dist;
                 centr = j;
             }
         }
-        vecOfCentroids[centr].culsterPoints.push_back(currPoint);
+        vecOfCentroids[centr].clusterPoints.push_back(currPoint);
     }
-    for (int i = 0; i < sizeOfVecOfCentroids; i++)
-    {
-        cout << vecOfCentroids[i].culsterPoints.size() << " ";
-    }
-    cout << endl;
 }
 
 void silhouette(vector<centroid> &vecOfCentroids, ofstream &outputFiletStream)
@@ -519,7 +569,7 @@ void silhouette(vector<centroid> &vecOfCentroids, ofstream &outputFiletStream)
     outputFiletStream << "Silhouette: [";
     for (int i = 0; i < numOfClusters; i++)
     {
-        int sizeOfCluster = vecOfCentroids[i].culsterPoints.size();
+        int sizeOfCluster = vecOfCentroids[i].clusterPoints.size();
         centroid *curCentroid = &vecOfCentroids[i];
         vector<float> aiDistances;
         float a_i;
@@ -527,11 +577,11 @@ void silhouette(vector<centroid> &vecOfCentroids, ofstream &outputFiletStream)
         for (int j = 0; j < sizeOfCluster; j++)
         {
             a_i = 0.0;
-            point *pt1 = curCentroid->culsterPoints[j];
+            point *pt1 = curCentroid->clusterPoints[j];
             for (int k = 0; k < sizeOfCluster; k++)
             {
-                point *pt2 = curCentroid->culsterPoints[k];
-                a_i = a_i + calculateDistance(curCentroid->culsterPoints[j], curCentroid->coordinates);
+                point *pt2 = curCentroid->clusterPoints[k];
+                a_i = a_i + euclDistance(curCentroid->clusterPoints[j], curCentroid->coordinates);
             }
             aiDistances.push_back(a_i / sizeOfCluster);
         }
@@ -545,7 +595,7 @@ void silhouette(vector<centroid> &vecOfCentroids, ofstream &outputFiletStream)
             if (j == i)
                 continue;
             centroid *tempCentroid = &vecOfCentroids[j];
-            float dist = calculateDistance(curCentroid->coordinates, tempCentroid->coordinates);
+            float dist = euclDistance(curCentroid->coordinates, tempCentroid->coordinates);
             if (dist < min)
             {
                 min = dist;
@@ -554,14 +604,14 @@ void silhouette(vector<centroid> &vecOfCentroids, ofstream &outputFiletStream)
         }
 
         centroid *secBestCentroid = &vecOfCentroids[centr];
-        int sizeOfSecBestCluster = secBestCentroid->culsterPoints.size();
+        int sizeOfSecBestCluster = secBestCentroid->clusterPoints.size();
         vector<float> biDistances;
         for (int j = 0; j < sizeOfCluster; j++)
         {
             float b_i = 0.0;
             for (int k = 0; k < sizeOfSecBestCluster; k++)
             {
-                b_i = b_i + calculateDistance(secBestCentroid->culsterPoints[k], curCentroid->culsterPoints[j]);
+                b_i = b_i + euclDistance(secBestCentroid->clusterPoints[k], curCentroid->clusterPoints[j]);
             }
             biDistances.push_back(b_i / sizeOfSecBestCluster);
         }

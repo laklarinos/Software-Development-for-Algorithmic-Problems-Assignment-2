@@ -4,7 +4,7 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
 {
     int numOfLines;
     int numOfElements;
-    int numOfDimensions;
+    int numOfPointsInLine;
 
     int L = lshCon.L;
     int k = lshCon.k;
@@ -18,36 +18,60 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
     fstream queryFilePtr;
     fstream outputFilePtr;
 
+    vector<point> arrayOfCurves1D;
+    int res = parsInit(inputFile, arrayOfCurves1D, &numOfLines, &numOfElements);
+
+    numOfPointsInLine = numOfElements - 1;
+
+    int numberOfNN = 1;
+    int rad = 10;
+
+    if (res == 1)
+    {
+        cout << "Error when ParsInit\n";
+        exit(1);
+    }
+
+    if (arrayOfCurves1D.empty())
+    {
+        cout << "Array Of Points is Empty\n";
+        exit(1);
+    }
+
+    vector<point> arrayOfCurves1DQ;
+    res = parsInit(queryFile, arrayOfCurves1DQ, &numOfLinesQ, &numOfElementsQ);
+    numOfDimensionsQ = numOfElementsQ - 1;
+
+    if (res == 1)
+    {
+        cout << "Error when ParsInit\n";
+        exit(1);
+    }
+
+    if (arrayOfCurves1DQ.empty())
+    {
+        cout << "Array Of Points is Empty\n";
+        exit(1);
+    }
+
+    vector<kNearest> list;
+    vector<kNearest> listTrue;
+
+    list.resize(numOfLinesQ);
+    listTrue.resize(numOfLinesQ);
+
     if (strcmp(frechet, "yes") == 0 && strcmp(metric, "discrete") == 0)
     {
-        vector<point> arrayOfCurves1D;
-        int res = parsInit(inputFile, arrayOfCurves1D, &numOfLines, &numOfElements);
-
-        numOfDimensions = numOfElements - 1;
-
-        int numberOfNN = 5;
-        int rad = 10;
-
-        if (res == 1)
-        {
-            cout << "Error when ParsInit\n";
-            exit(1);
-        }
-
-        if (arrayOfCurves1D.empty())
-        {
-            cout << "Array Of Points is Empty\n";
-            exit(1);
-        }
-
+        //init hash tables...
         vector<hashTable *> arrayOfHashTables(L);
         for (int i = 0; i < L; i++)
         {
-            arrayOfHashTables[i] = new hashTable(numOfLines / 4, &lshCon, numOfDimensions, 1);
+            arrayOfHashTables[i] = new hashTable(numOfLines / 4, &lshCon, numOfPointsInLine, 1);
         }
 
         // need to create curves...
-        vector<map<float, float>> arrayOfCurves(numOfLines);
+        //vector<map<float, float>> arrayOfCurves(numOfLines);
+        vector<vector<pair<float, float>>> arrayOfCurves2D(numOfLines);
         vector<pair<float, float>> arrayOfTxAndTy(L);
         std::default_random_engine generator;
         std::uniform_real_distribution<float> distribution(0.0, delta);
@@ -64,10 +88,10 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
         for (int i = 0; i < numOfLines; i++)
         {
             point *curPoint = &arrayOfCurves1D[i];
-            for (int j = 0; j < numOfDimensions; j++)
+            for (int j = 0; j < numOfPointsInLine; j++)
             {
                 float dValue = curPoint->pVector[j];
-                arrayOfCurves[i].insert(pair<int, float>(j + 1, dValue));
+                arrayOfCurves2D[i].push_back(pair<float, float>(j + 1, dValue));
             }
         }
 
@@ -79,11 +103,11 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
             {
                 // snaps the curves on the grid, deletes duplicates and returns a vector
                 vector<float> temp;
-                temp = snap(numOfDimensions, arrayOfCurves[i], delta, arrayOfTxAndTy[j]);
+                temp = snap(2, arrayOfCurves2D[i], delta, arrayOfTxAndTy[j]);
 
                 //  padding
                 int sizeOfVector = temp.size();
-                for (int i = sizeOfVector - 1; i < 2 * numOfDimensions; i++)
+                for (int i = sizeOfVector - 1; i < 2 * numOfPointsInLine; i++)
                 {
                     temp.push_back(500); // a number that does not exist in the data set
                 }
@@ -97,47 +121,23 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
         }
 
         // read query file...
-        vector<point> arrayOfCurves1DQ;
-        res = parsInit(queryFile, arrayOfCurves1DQ, &numOfLinesQ, &numOfElementsQ);
-        numOfDimensionsQ = numOfElementsQ - 1;
-
-        if (res == 1)
-        {
-            cout << "Error when ParsInit\n";
-            exit(1);
-        }
-
-        if (arrayOfCurves1DQ.empty())
-        {
-            cout << "Array Of Points is Empty\n";
-            exit(1);
-        }
-
-        vector<kNearest> list;
-        vector<kNearest> listTrue;
-        vector<kNearest> listR;
-
-        list.resize(numOfLinesQ);
-        listTrue.resize(numOfLinesQ);
-        listR.resize(numOfLinesQ);
-
-        ofstream outputFileStream;
-
-        outputFileStream.open(outputFile, std::ios_base::app);
 
         numberOfNN = 1;
-        vector<map<float, float>> arrayOfCurvesQ(numOfLinesQ);
+
+        // create 2d curves to snap on grid...
+        vector<vector<pair<float, float>>> arrayOfCurvesQ(numOfLinesQ);
 
         for (int i = 0; i < numOfLinesQ; i++)
         {
             point *curPoint = &arrayOfCurves1DQ[i];
-            for (int j = 0; j < numOfDimensions; j++)
+            for (int j = 0; j < numOfPointsInLine; j++)
             {
                 float dValue = curPoint->pVector[j];
-                arrayOfCurvesQ[i].insert(pair<int, float>(j + 1, dValue));
+                arrayOfCurvesQ[i].push_back(pair<float, float>(j + 1, dValue));
             }
         }
 
+        // create snapped, vectorized, padded curves...
         vector<vector<vector<float>>> arrayOfCurves1DQSnapped(numOfLinesQ);
         for (int i = 0; i < numOfLinesQ; i++)
         {
@@ -145,191 +145,191 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
             for (int j = 0; j < L; j++)
             {
                 vector<float> temp;
-                temp = snap(numOfDimensions, arrayOfCurvesQ[i], delta, arrayOfTxAndTy[j]);
+                temp = snap(2, arrayOfCurvesQ[i], delta, arrayOfTxAndTy[j]);
                 //  padding
                 int sizeOfVector = temp.size();
-                for (int i = sizeOfVector - 1; i < 2 * numOfDimensions; i++)
+                for (int i = sizeOfVector - 1; i < 2 * numOfPointsInLine; i++)
                 {
-                    temp.push_back(INT_MAX - 5000); // a number that does not exist in the data set
+                    temp.push_back(5000); // a number that does not exist in the data set
                 }
                 arrayOfSnappedCurvePerHashTable[j] = temp;
             }
             arrayOfCurves1DQSnapped[i] = arrayOfSnappedCurvePerHashTable;
         }
 
-        float MAF = -1;
-        float averageAppDist = 0.0;
-        float averageTruDist = 0.0;
-        int c = 0;
+        // print to file...
+        printToFile(outputFile, (char *)"LSH_Frechet_Discrete", list, listTrue, arrayOfHashTables, numberOfNN, arrayOfCurves1DQ, arrayOfCurves1DQSnapped);
+    }
+    else if (strcmp(frechet, "yes") == 0 && strcmp(metric, "continuous") == 0)
+    {
+        // filtering -> snapping -> minima/maxima -> vectorization -> padding
 
-        for (int i = 0; i < numOfLinesQ; i++)
+        // init hashtables...
+        L = 1;
+        vector<hashTable *> arrayOfHashTables(L);
+        for (int i = 0; i < L; i++)
         {
-            int flag = 0;
-            initKNearest(numberOfNN, &(list[i]));
-            initKNearest(numberOfNN, &(listTrue[i]));
-            initKNearest(0, &(listR[i]));
+            arrayOfHashTables[i] = new hashTable(numOfLines / 4, &lshCon, numOfPointsInLine, 1, 1);
+        }
 
-            for (int j = 0; j < L; j++)
+        vector<vector<pair<float, float>>> arrayOfCurves2D(numOfLines);
+        pair<float, float> arrayOfTxAndTy;
+        std::default_random_engine generator;
+        std::uniform_real_distribution<float> distribution(0.0, delta);
+
+        // create 2d curve from input line...
+        for (int i = 0; i < numOfLines; i++)
+        {
+            point *curPoint = &arrayOfCurves1D[i];
+            for (int j = 0; j < numOfPointsInLine - 1; j++)
             {
-                point temPoint(arrayOfCurves1DQSnapped[i][j]);
-                arrayOfHashTables[j]->findKNeighbors(&arrayOfCurves1DQ[i], &list[i], arrayOfCurves1DQSnapped[i][j]);
-                arrayOfHashTables[j]->findKNeighborsTrue(&arrayOfCurves1DQ[i], &listTrue[i], arrayOfCurves1DQSnapped[i][j]);
+                float dValue = curPoint->pVector[j];
+                arrayOfCurves2D[i].push_back(pair<int, float>(j + 1, dValue));
             }
+        }
 
-            outputFileStream << "Query: " << arrayOfCurves1DQ[i].getKey() << endl;
-            outputFileStream << "Algorithm:  LSH_Frechet_Discrete" << endl;
-            int tempId = -1;
+        float epsilon = 1.001;
+        float tx = distribution(generator);
+        float ty = distribution(generator);
+        arrayOfTxAndTy = pair<float, float>(tx, ty);
 
-            for (int z = 0; z < list[i].size; z++)
+        // for each line, filter it, snap it, minima-maxima it, pad it...
+        for (int i = 0; i < numOfLines; i++)
+        {
+            int sizeOfMap = arrayOfCurves2D[i].size();
+            
+            //filtering
+            //result is a vector with pairs but filtered
+            for (int j = 0; j < sizeOfMap - 3; j++)
             {
-                if (list[i].dist[z] != MAXFLOAT)
-                {
-                    // we have a neighbor
-                    outputFileStream << "Approximate nearest neighbor"
-                                     << ": " << list[i].nearestPoints[z]->getKey() << endl;
-                    outputFileStream << "Approximate distance: " << list[i].dist[z] << endl;
 
-                    if (listTrue[i].dist[z] != MAXFLOAT)
-                    {
-                        // we have a neighbor
-                        float temp = list[i].dist[z] / listTrue[i].dist[z];
-                        if (temp > MAF)
-                        {
-                            MAF = temp;
-                        }
-                        flag = 1;
-                        outputFileStream << "Approximate true neighbor"
-                                     << ": " << listTrue[i].nearestPoints[z]->getKey() << endl;
-                        outputFileStream << "True distance: " << listTrue[i].dist[z] << endl;
-                    }
-                    c++;
-                    averageAppDist += list[i].vecOfTimes[z].count();
-                    averageTruDist += listTrue[i].vecOfTimes[z].count();
-                    // outputFileStream << "   tLSH: " << list[i].vecOfTimes[z].count() << " ms" << endl;
-                    // //if (flag)
-                    // outputFileStream << "   tTrue: " << listTrue[i].vecOfTimes[z].count() << " ms" << endl
-                    //                  << endl;
+                pair<float, float> pairA = arrayOfCurves2D[i][j];
+                pair<float, float> pairB = arrayOfCurves2D[i][j + 1];
+                pair<float, float> pairC = arrayOfCurves2D[i][j + 2];
+                //if |a − b| ≤ e and |b − c| ≤ e
+                if (abs(pairA.second - pairB.second) <= epsilon && abs(pairB.second - pairC.second) <= epsilon)
+                {
+                    j += 2;
+                    //erase element
+                    arrayOfCurves2D[i][j] = pair<float, float>(-1, -1);
                 }
             }
-            outputFileStream << "\n////////////////////////////////////////////////////////////\n";
+
+            // erase all elements == pair<float,float>(-1,-1)
+            arrayOfCurves2D[i].erase(std::remove(arrayOfCurves2D[i].begin(), arrayOfCurves2D[i].end(), pair<float, float>(-1, -1)), arrayOfCurves2D[i].end()); //erase remove technique
+
+            // keep track of the filtered curve, save only the y's...
+            vector<float> filteredCurve;
+            for (int k = 0; k < arrayOfCurves2D[i].size(); k++)
+            {
+                filteredCurve.push_back(arrayOfCurves2D[i][k].second); //only y's
+            }
+            arrayOfCurves1D[i].filteredCurve = filteredCurve;
+
+            // snaps the curves on the grid, deletes duplicates and returns a vector
+            vector<float> temp;
+            temp = snap(1, arrayOfCurves2D[i], delta, arrayOfTxAndTy);
+
+            // padding
+            int sizeOfVector = temp.size();
+            for (int i = sizeOfVector - 1; i < numOfPointsInLine; i++)
+            {
+                // a number that does not exist in the data set
+                temp.push_back(5000); 
+            }
+
+            // insert input curve to hashTable
+            int key = arrayOfHashTables[0]->insert(&(arrayOfCurves1D[i]), temp);
         }
-        if (c != 0)
+
+        /// FOR QUERY ///
+        vector<vector<pair<float, float>>> arrayOfCurvesQ2D(numOfLinesQ);
+
+        // create 2d curve out of 1d query line
+        for (int i = 0; i < numOfLinesQ; i++)
         {
-            outputFileStream << "tApproximateAverage: " << averageAppDist / c << " ms" << endl;
-            outputFileStream << "tTrueAverage: " << averageTruDist / c << " ms" << endl;
+            point *curPoint = &arrayOfCurves1DQ[i];
+            for (int j = 0; j < numOfPointsInLine; j++)
+            {
+                float dValue = curPoint->pVector[j];
+                arrayOfCurvesQ2D[i].push_back(pair<float, float>(j + 1, dValue));
+            }
         }
-        outputFileStream << "MAF: <double> " << MAF << endl;
+
+        vector<vector<vector<float>>> arrayOfCurves1DQSnapped(numOfLinesQ);
+
+        //for each query, filter it, snap it, minima-maxima it, pad it
+        for (int i = 0; i < numOfLinesQ; i++)
+        {
+            int sizeOfMap = arrayOfCurvesQ2D[i].size();
+
+            // filtering
+            for (int j = 0; j < sizeOfMap - 3; j++)
+            {
+
+                pair<float, float> pairA = arrayOfCurvesQ2D[i][j];
+                pair<float, float> pairB = arrayOfCurvesQ2D[i][j + 1];
+                pair<float, float> pairC = arrayOfCurvesQ2D[i][j + 2];
+                //if |a − b| ≤ e and |b − c| ≤ e
+                if (abs(pairA.second - pairB.second) <= epsilon && abs(pairB.second - pairC.second) <= epsilon)
+                {
+                    j += 2;
+                    //erase element
+                    arrayOfCurvesQ2D[i][j] = pair<float, float>(-1, -1);
+                }
+            }
+
+            // erase all elements == pair<float, float>(-1, -1)
+            arrayOfCurvesQ2D[i].erase(std::remove(arrayOfCurvesQ2D[i].begin(), arrayOfCurvesQ2D[i].end(), pair<float, float>(-1, -1)), arrayOfCurvesQ2D[i].end());
+
+            // save the filtered but keep y's only
+            vector<float> filteredQueryCurve1D;
+            for (int k = 0; k < arrayOfCurvesQ2D[i].size(); k++)
+            {
+                filteredQueryCurve1D.push_back(arrayOfCurvesQ2D[i][k].second);
+            }
+            arrayOfCurves1DQ[i].filteredCurve = filteredQueryCurve1D;
+
+            // keep track of the snapped curves...
+            vector<vector<float>> arrayOfSnappedCurveQPerHashTable(1);
+            vector<float> temp;
+            temp = snap(1, arrayOfCurvesQ2D[i], delta, arrayOfTxAndTy);
+
+            // padding
+            int sizeOfVector = temp.size();
+            for (int i = sizeOfVector - 1; i < numOfPointsInLine; i++)
+            {
+                temp.push_back(5000); // a number that does not exist in the data set
+            }
+            arrayOfSnappedCurveQPerHashTable[0] = temp;
+            arrayOfCurves1DQSnapped[i] = arrayOfSnappedCurveQPerHashTable;
+        }
+
+        printToFile(outputFile, (char *)"LSH_Frechet_Continuous", list, listTrue, arrayOfHashTables, numberOfNN, arrayOfCurves1DQ, arrayOfCurves1DQSnapped);
     }
     else if (strcmp(frechet, "no") == 0)
     {
-        vector<point> arrayOfPoints;
-        int res = parsInit(inputFile, arrayOfPoints, &numOfLines, &numOfElements);
-
-        numOfDimensions = numOfElements - 1;
-
-        int numberOfNN = 5;
-        int rad = 10;
-
-        if (res == 1)
-        {
-            cout << "Error when ParsInit\n";
-            exit(1);
-        }
-
-        if (arrayOfPoints.empty())
-        {
-            cout << "Array Of Points is Empty\n";
-            exit(1);
-        }
 
         vector<hashTable *> arrayOfHashTables(L);
         for (int i = 0; i < L; i++)
         {
-            arrayOfHashTables[i] = new hashTable(numOfLines / 4, &lshCon, numOfDimensions);
+            arrayOfHashTables[i] = new hashTable(numOfLines / 4, &lshCon, numOfPointsInLine);
         }
 
         for (int i = 0; i < numOfLines; i++)
         {
             for (int j = 0; j < L; j++)
             {
-                arrayOfHashTables[j]->insert(&arrayOfPoints[i]);
+                arrayOfHashTables[j]->insert(&arrayOfCurves1D[i]);
             }
         }
 
-        vector<point> arrayOfQueryPoints;
-        res = parsInit(inputFile, arrayOfQueryPoints, &numOfLinesQ, &numOfElementsQ);
+        printToFile(outputFile, (char *)"LSH_Algorithm", list, listTrue, arrayOfHashTables, numberOfNN, arrayOfCurves1DQ);
 
-        numOfDimensionsQ = numOfElementsQ - 1;
-        if (res == 1)
-        {
-            exit(1);
-        }
-
-        if (arrayOfQueryPoints.empty())
-        {
-            exit(1);
-        }
-
-        vector<kNearest> list;
-        vector<kNearest> listTrue;
-        vector<kNearest> listR;
-
-        list.resize(numOfLinesQ);
-        listTrue.resize(numOfLinesQ);
-        listR.resize(numOfLinesQ);
-
-        ofstream outputFileStream;
-
-        outputFileStream.open(outputFile, std::ios_base::app);
-
-        for (int i = 0; i < numOfLinesQ; i++)
-        {
-            int flag = 0;
-            initKNearest(numberOfNN, &(list[i]));
-            initKNearest(numberOfNN, &(listTrue[i]));
-            initKNearest(0, &(listR[i]));
-            for (int j = 0; j < L; j++)
-            {
-                arrayOfHashTables[j]->findKNeighbors(&(arrayOfQueryPoints[i]), &list[i]);
-                arrayOfHashTables[j]->findKNeighborsTrue(&(arrayOfQueryPoints[i]), &listTrue[i]);
-                arrayOfHashTables[j]->findNeighborsR(&(arrayOfQueryPoints[i]), &listR[i], rad);
-            }
-            outputFileStream << "Query: " << arrayOfQueryPoints[i].getKey() << endl;
-            int tempId = -1;
-            for (int z = 0; z < list[i].size; z++)
-            {
-                if (list[i].dist[z] != MAXFLOAT)
-                {
-                    // we have a neighbor
-                    outputFileStream << "Nearest neighbor-" << z + 1 << ": " << list[i].nearestPoints[z]->getKey() << endl;
-                    outputFileStream << "distanceLSH: " << list[i].dist[z] << endl;
-                    if (listTrue[i].dist[z] != MAXFLOAT)
-                    {
-                        // we have a neighbor
-                        flag = 1;
-                        outputFileStream << "distanceTrue: " << listTrue[i].dist[z] << endl;
-                    }
-                    outputFileStream << "   tLSH: " << list[i].vecOfTimes[z].count() << " ms" << endl;
-                    //if (flag)
-                    outputFileStream << "   tTrue: " << listTrue[i].vecOfTimes[z].count() << " ms" << endl
-                                     << endl;
-                }
-            }
-
-            outputFileStream << "R-nearest neigbors: " << endl;
-
-            for (int w = 0; w < listR[i].size; w++)
-            {
-                outputFileStream << "item_id: " << listR[i].nearestPoints[w]->getKey() << endl;
-            }
-            outputFileStream << "\n////////////////////////////////////////////////////////////\n";
-        }
-        outputFileStream.close();
-
-        for (int i = 0; i < L; i++)
-        {
-            delete arrayOfHashTables[i];
-        }
+        // for (int i = 0; i < L; i++)
+        // {
+        //     delete arrayOfHashTables[i];
+        // }
     }
 
     ////////////////////////////////////////////////////////////////

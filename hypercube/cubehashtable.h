@@ -1,8 +1,10 @@
 
-#ifndef HASH
-#define HASH
+#ifndef HASH_CUBE
+#define HASH_CUBE
 #include "../importantStructs/linkedlist.h"
+#include "../importantStructs/structs.h"
 #include "../helpers/helpers.h"
+
 class hashTableCube
 {
 
