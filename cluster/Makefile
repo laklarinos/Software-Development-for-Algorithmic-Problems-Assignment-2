@@ -6,17 +6,17 @@ CUB = ../hypercube/
 FRE = ../Fred-master/src/
 PREVDIR = ../
 
-clusterprog: main.o cluster.o checkcommandlinecluster.o helpers.o lshhashtable.o cubehashtable.o point.o linkedlist.o frechet.o config.o pointRepo.o interval.o simplification.o curve.o curveMine.o
+clusterprog: main.o cluster.o checkcommandlinecluster.o helpers.o lshhashtable.o cubehashtable.o point.o linkedlist.o frechet.o config.o pointRepo.o interval.o simplification.o curve.o
 	
-	$(CC) -o clusterprog main.o cluster.o checkcommandlinecluster.o helpers.o lshhashtable.o cubehashtable.o point.o linkedlist.o frechet.o config.o pointRepo.o interval.o simplification.o curve.o curveMine.o
+	$(CC) -o clusterprog main.o cluster.o checkcommandlinecluster.o helpers.o lshhashtable.o cubehashtable.o point.o linkedlist.o frechet.o config.o pointRepo.o interval.o simplification.o curve.o
 
-cluster: cluster.o clusterhashtable.o helpers.o lshhashTable.o cubehashTable.o
+cluster: cluster.o helpers.o lshhashTable.o cubehashTable.o
 
-	$(CC) -o cluster.o lshhashtable.o helpers.o lshhashTable.o cubehashTable.o
+	$(CC) -o cluster.o helpers.o lshhashTable.o cubehashTable.o
 
-cluster.o: cluster.cpp clusterhashtable.cpp $(IMP)linkedlist.cpp $(HEL)helpers.cpp $(CUB)cubehashtable.cpp $(LSH)lshhashTable.cpp
+cluster.o: cluster.cpp $(IMP)linkedlist.cpp $(HEL)helpers.cpp $(CUB)cubehashtable.cpp $(LSH)lshhashTable.cpp
 
-	$(CC) -c cluster.cpp clusterhashtable.cpp $(IMP)linkedlist.cpp $(HEL)helpers.cpp $(CUB)cubehashtable.cpp $(LSH)lshhashTable.cpp
+	$(CC) -c cluster.cpp $(IMP)linkedlist.cpp $(HEL)helpers.cpp $(CUB)cubehashtable.cpp $(LSH)lshhashTable.cpp
 
 ######## MAIN #######
 main.o: main.cpp checkcommandlinecluster.cpp cluster.cpp $(HEL)helpers.cpp $(LSH)lshhashtable.cpp $(CUB)cubehashtable.cpp $(IMP)point.cpp $(IMP)linkedlist.cpp 
@@ -70,10 +70,6 @@ helpers: helpers.o frechet.o
 helpers.o: $(HEL)helpers.cpp $(IMP)point.cpp $(LSH)lshhashTable.cpp
 
 	$(CC) -c $(HEL)helpers.cpp $(IMP)point.cpp $(LSH)lshhashTable.cpp
-
-curveMine.o: $(IMP)curveMine.cpp 
-
-	$(CC) -c $(IMP)curveMine.cpp
 ##########################################
 
 # $./cluster –i <input file> –c <configuration file> -o <output file> -update <Mean
@@ -86,23 +82,23 @@ run:
 
 runlsh:
 
-	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Vector -assignment LSH
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Vector -assignment LSH -silhouette no
 
 runhyper:
 
-	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Vector -assignment Hypercube
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Vector -assignment Hypercube -silhouette no
 
 runclassic:
 
-	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Vector -assignment Classic
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Vector -assignment Classic -silhouette no
 
 runlshfrechet:
 
-	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Frechet -assignment LSH
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Frechet -assignment LSH -silhouette no
 
 runclassicfrechet:
 
-	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Frechet -assignment Classic
+	./clusterprog –i $(PREVDIR)nasd_input2017 –c cluster.conf -o $(PREVDIR)output.txt -update Mean_Frechet -assignment Classic -silhouette no
 
 valgrind:
 

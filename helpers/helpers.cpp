@@ -496,46 +496,48 @@ vector<float> snap(int dim, vector<pair<float, float>> &mapCurve, double delta, 
     }
 }
 
-float DFD(vector<float> curve1, vector<float> curve2)
+float DFD(vector<float> curve1, vector<float> curve2, int meanFrechet, vector<vector<float>> &vecToFill)
 {
     // Discrete frechet implemented with Dynamic Programming...
     int sizeOfCurve1 = curve1.size();
     int sizeOfCurve2 = curve2.size();
 
-    vector<float> array(sizeOfCurve1);
-    vector<vector<float>> completeArray(sizeOfCurve2);
+    vector<vector<float>> completeArray(sizeOfCurve1);
 
-    for (int i = 0; i < sizeOfCurve2; i++)
+    for (int i = 0; i < sizeOfCurve1; i++)
     {
-        completeArray[i] = array;
+        completeArray[i] = vector<float>(sizeOfCurve2);
     }
 
     completeArray[0][0] = euclDistanceOf2Points(0, 0, curve1[0], curve2[0]); // x1, x2, y1, y2
+    //cout << completeArray[0][0] << " FIRST" << endl;
+
     for (int i = 0; i < sizeOfCurve1; i++)
     {
         for (int j = 0; j < sizeOfCurve2; j++)
         {
+            float dist;
             if (i == 0 & j > 0)
             {
-                float dist = euclDistanceOf2Points(0, j, curve1[0], curve2[j]);
+                dist = euclDistanceOf2Points(0, j, curve1[0], curve2[j]);
                 completeArray[i][j] = max<float>(completeArray[0][j - 1], dist); //max{c(0, j − 1), ||p0 − qj||}
-                //cout << "1: " << completeArray[i][j] << endl;
             }
-
             if (i > 0 && j == 0)
             {
-                float dist = euclDistanceOf2Points(i, 0, curve1[i], curve2[0]);
+                dist = euclDistanceOf2Points(i, 0, curve1[i], curve2[0]);
                 completeArray[i][j] = max<float>(completeArray[i - 1][0], dist); //max{c(i-1, 0), ||pi − q0||}
-                //cout << "2: " << completeArray[i][j] << endl;
             }
             if (i > 0 && j > 0)
             {
-                float dist1 = euclDistanceOf2Points(i, j, curve1[i], curve2[j]);
+                dist = euclDistanceOf2Points(i, j, curve1[i], curve2[j]);
                 float min1 = min<float>(completeArray[i - 1][j], min<float>(completeArray[i - 1][j - 1], completeArray[i][j - 1])); //min{c(i − 1, j), c(i − 1, j − 1), c(i, j − 1)}
-                completeArray[i][j] = max<float>(min1, dist1);                                                                      // max {min, ||pi − qj||} .
-                //cout << "3: " << completeArray[i][j] << endl;
+                completeArray[i][j] = max<float>(min1, dist);
             }
         }
+    }
+    if (meanFrechet == 1)
+    {
+        vecToFill = completeArray;
     }
     return completeArray[sizeOfCurve1 - 1][sizeOfCurve2 - 1];
 }
@@ -552,7 +554,7 @@ float CFD(vector<float> curve1, vector<float> curve2)
 
 Curve toRepoCurve(vector<float> myCurve)
 {
-    Curve c(myCurve.size(), 1, "randy");
+    Curve c(myCurve.size(), 1, "tsimikas");
     for (float k : myCurve)
     {
         // cout << "k is " << k << endl;
@@ -660,24 +662,81 @@ void printToFile(char *outputFile, char *algorithm, vector<kNearest> &list,
 vector<float> meanCurve(vector<vector<float>> &vecOfCurves)
 {
     int sizeOfVector = vecOfCurves.size();
-    if(sizeOfVector == 1) return vecOfCurves[0];
+    if (sizeOfVector == 1)
+    {
+        return vecOfCurves[0];
+    }
+
     vector<vector<float>> temp;
-    int i;
+    vector<float> vecToInsert;
+    vector<float> vec;
+    int i = 0;
+
     for (i = 0; i < sizeOfVector - 1; i++)
     {
-        temp.push_back(meanFrechet(vecOfCurves[i], vecOfCurves[i + 1]));
+        meanFrechet(vecOfCurves[i], vecOfCurves[i + 1], &vecToInsert);
+        vec = vecToInsert;
+        temp.push_back(vec);
         i += 2;
     }
 
-    if (sizeOfVector - i == 2)
+    if (sizeOfVector - i == 1)
     {
         temp.push_back(vecOfCurves[sizeOfVector - 1]);
     }
-    
+
     return meanCurve(temp);
 }
 
-vector<float> meanFrechet(vector<float> &curve1, vector<float> &curve2)
+void meanFrechet(vector<float> &curve1, vector<float> &curve2, vector<float> *vecToFill)
 {
-    
+    vector<vector<float>> vecOfDFD;
+    DFD(curve1, curve2, 1, vecOfDFD);
+    vector<float> vecToRet;
+
+    // now lets find optimal traversal...
+    vector<pair<int, int>> vecOfPairs = getOptimalTraversal(vecOfDFD, curve1, curve2);
+    int size = vecOfPairs.size();
+
+    for (int i = 0; i < size; i++)
+    {
+        vecToRet.push_back((curve1[vecOfPairs[i].first] + curve2[vecOfPairs[i].second]) / 2);
+    }
+    //cout << "2\n";
+    *vecToFill = vecToRet;
+}
+
+vector<pair<int, int>> getOptimalTraversal(vector<vector<float>> vecOfDFD, vector<float> &curve1, vector<float> &curve2)
+{
+    int plen = curve1.size();
+    int qlen = curve2.size();
+
+    vector<float> pi = curve1;
+    vector<float> qi = curve2;
+    vector<pair<int, int>> traversal;
+
+    traversal.push_back(pair<int, int>(plen, qlen));
+
+    plen--;
+    qlen--;
+
+    while (plen != 0 && qlen != 0)
+    {
+        float minElem = min<float>(min<float>(vecOfDFD[plen - 1][qlen], vecOfDFD[plen][qlen - 1]), vecOfDFD[plen - 1][qlen - 1]);
+
+        if (minElem == vecOfDFD[plen - 1][qlen])
+        {
+            traversal.push_back(pair<int, int>(--plen, qlen));
+        }
+        else if (minElem == vecOfDFD[plen][qlen - 1])
+        {
+            traversal.push_back(pair<int, int>(plen, --qlen));
+        }
+        else
+        {
+            traversal.push_back(pair<int, int>(--plen, --qlen));
+        }
+    }
+
+    return traversal;
 }

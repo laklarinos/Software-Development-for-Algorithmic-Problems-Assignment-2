@@ -109,7 +109,7 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
                 int sizeOfVector = temp.size();
                 for (int i = sizeOfVector - 1; i < 2 * numOfPointsInLine; i++)
                 {
-                    temp.push_back(500); // a number that does not exist in the data set
+                    temp.push_back(5000); // a number that does not exist in the data set
                 }
 
                 int key = arrayOfHashTables[j]->insert(&(arrayOfCurves1D[i]), temp);
@@ -163,7 +163,6 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
     else if (strcmp(frechet, "yes") == 0 && strcmp(metric, "continuous") == 0)
     {
         // filtering -> snapping -> minima/maxima -> vectorization -> padding
-
         // init hashtables...
         L = 1;
         vector<hashTable *> arrayOfHashTables(L);
@@ -224,6 +223,8 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
             {
                 filteredCurve.push_back(arrayOfCurves2D[i][k].second); //only y's
             }
+
+            //keep track of the filtered curve...
             arrayOfCurves1D[i].filteredCurve = filteredCurve;
 
             // snaps the curves on the grid, deletes duplicates and returns a vector
@@ -235,7 +236,7 @@ int lsh(char *inputFile, char *queryFile, char *outputFile, lshConstants &lshCon
             for (int i = sizeOfVector - 1; i < numOfPointsInLine; i++)
             {
                 // a number that does not exist in the data set
-                temp.push_back(5000); 
+                temp.push_back(5000);
             }
 
             // insert input curve to hashTable

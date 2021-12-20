@@ -44,41 +44,24 @@ void updateCentroids(vector<centroid> &vecOfCentroids, int numOfClusters)
 
 void updateCentroidsCurve(vector<centroid> &vecOfCentroids, int numOfClusters)
 {
-    vector<float> medVector;
     for (int i = 0; i < numOfClusters; i++)
     {
         centroid curCentroid = vecOfCentroids[i];
         vector<point *> vecOfClusterPoints = curCentroid.clusterPoints;
+
         int sizeOfCluster = vecOfClusterPoints.size();
-        int centroidCoordinates = curCentroid.coordinates->pVector.size();
-        int sum;
-        medVector.push_back(0);
 
         vector<vector<float>> vecOfArraysOfClusterPoints;
+
         for (int j = 0; j < sizeOfCluster; j++)
         {
             vecOfArraysOfClusterPoints.push_back(vecOfClusterPoints[j]->pVector);
         }
 
-        // for (int j = 1; j < centroidCoordinates; j++)
-        // {
-        //     sum = 0;
-        //     for (int z = 0; z < sizeOfCluster; z++)
-        //     {
-        //         sum = vecOfClusterPoints[z]->pVector[j] + sum;
-        //     }
-        //     medVector.push_back(sum);
-        // }
+        vector<float> temp = meanCurve(vecOfArraysOfClusterPoints);
 
-        // if (sizeOfCluster != 0)
-        //     for (int k = 0; k < centroidCoordinates; k++)
-        //     {
-        //         medVector[k] = medVector[k] / (sizeOfCluster);
-        //     }
-
-        point *pt = new point(medVector);
-        vecOfCentroids[i].coordinates = pt;
-        medVector.clear();
+        vecOfCentroids[i] = new point(temp);
+        // filter it...
     }
 }
 
@@ -106,9 +89,9 @@ void initCentroids(vector<centroid> &vecOfCentroids, int numOfClusters, vector<p
         float dist;
         int numOfPointsInCluster = vecOfPoints.size();
 
-        for (int i = 0; i < numOfPointsInCluster; i++)
+        for (int k = 0; k < numOfPointsInCluster; k++)
         {
-            vector<float> tempInt = vecOfPoints[i].pVector;
+            vector<float> tempInt = vecOfPoints[k].pVector;
             point *curPoint = new point(tempInt);
 
             for (int j = 0; j < i; j++)
@@ -138,10 +121,9 @@ void initCentroids(vector<centroid> &vecOfCentroids, int numOfClusters, vector<p
             vecOfDistances.push_back(min);
             delete curPoint;
         }
-
         for (int z = 0; z < vecOfDistances.size(); z++)
         {
-            vecOfDistances.at(i) = sqrt(vecOfDistances[z] / max);
+            vecOfDistances.at(z) = sqrt(vecOfDistances[z] / max);
         }
 
         int t;
@@ -168,7 +150,7 @@ void initCentroids(vector<centroid> &vecOfCentroids, int numOfClusters, vector<p
             if (cumulativeProbability >= uniDis(gen))
             {
                 point *pt = new point(vecOfPoints[t].pVector);
-                pt->pVector[0] = 0;
+                //pt->pVector[0] = 0;
                 vecOfCentroids.push_back(pt);
                 break;
             }
@@ -176,14 +158,16 @@ void initCentroids(vector<centroid> &vecOfCentroids, int numOfClusters, vector<p
     }
 }
 
-void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, vector<hashTable *> &vecOfHashTables)
+void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, vector<hashTable *> &vecOfHashTables, int frechet, vector<pair<float, float>> vecOfTxAndTy)
 {
     int sizeOfVecOfCentroids = vecOfCentroids.size();
     int sizeOfVecOfHashTables = vecOfHashTables.size();
     int sizeOfVecOfPoints = vecOfPoints.size();
 
+    float delta = 3.25;
+
     vector<kNearest> list(sizeOfVecOfCentroids);
-    vector<map<int, double>> vecOfMaps(sizeOfVecOfCentroids);
+    vector<map<string, double>> vecOfMaps(sizeOfVecOfCentroids);
     float min = MAXFLOAT;
 
     for (int i = 0; i < sizeOfVecOfCentroids; i++)
@@ -193,7 +177,10 @@ void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, ve
             if (i == j)
                 continue;
             float dist;
-            dist = euclDistance(vecOfCentroids[i].coordinates, vecOfCentroids[j].coordinates);
+            if(frechet == 0)
+                dist = euclDistance(vecOfCentroids[i].coordinates, vecOfCentroids[j].coordinates);
+            if(frechet == 1)
+                dist = DFD(vecOfCentroids[i].coordinates->pVector, vecOfCentroids[j].coordinates->pVector);
 
             if (dist < min)
             {
@@ -214,10 +201,36 @@ void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, ve
         {
             counter++;
             point *centroidPoint = vecOfCentroids[i].coordinates;
+            vector<float> temp;
+
             for (int j = 0; j < sizeOfVecOfHashTables; j++)
             {
-                vecOfHashTables[j]->findNeighborsR(centroidPoint, &list[i], R);
+                if (frechet == 1)
+                {
+                    vector<pair<float, float>> pointToCurve;
+                    int numOfElements = centroidPoint->pVector.size();
+                    for (int j = 0; j < numOfElements; j++)
+                    {
+                        float dValue = centroidPoint->pVector[j];
+                        pointToCurve.push_back(pair<float, float>(j + 1, dValue));
+                    }
+
+                    temp = snap(2, pointToCurve, delta, vecOfTxAndTy[j]);
+
+                    //  padding
+                    int sizeOfVector = temp.size();
+                    for (int i = sizeOfVector - 1; i < 2 * numOfElements; i++)
+                    {
+                        temp.push_back(5000); // a number that does not exist in the data set
+                    }
+                    vecOfHashTables[j]->findNeighborsR(centroidPoint, &list[i], R, temp, 1);
+                }
+                else
+                {
+                    vecOfHashTables[j]->findNeighborsR(centroidPoint, &list[i], R);
+                }
             }
+
             prevSize = curSize;
             curSize = list[i].nearestPoints.size();
             R *= 2;
@@ -226,9 +239,10 @@ void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, ve
         for (int k = 0; k < list[i].nearestPoints.size(); k++)
         {
             point *pointInserted = list[i].nearestPoints[k];
-            int idOfPointInserted = pointInserted->pVector[0];
+            //cout << pointInserted->pVector.size() << endl;
+            string idOfPointInserted = pointInserted->getKey();
             double distOfPointInserted = list[i].dist[k];
-            vecOfMaps[i].insert(pair<int, double>(idOfPointInserted, distOfPointInserted));
+            vecOfMaps[i].insert(pair<string, double>(idOfPointInserted, distOfPointInserted));
         }
     }
 
@@ -238,7 +252,7 @@ void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, ve
         for (int j = 0; j < sizeOfNearestPointsList; j++)
         {
             point *pointToFind = list[i].nearestPoints[j];
-            int idOfPointToFind = pointToFind->pVector[0];
+            string idOfPointToFind = pointToFind->getKey();
             double distOfPointToFind = list[i].dist[j];
 
             vector<int> centroidsFound;
@@ -272,28 +286,36 @@ void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, ve
                 }
             }
 
+            //cout << centroidsFound.size() << ", ";
             // time to erase...
             for (int w = 0; w < centroidsFound.size(); w++)
             {
-                auto it = vecOfMaps[centroidsFound[w]].find(idOfPointToFind);
+                //auto it = vecOfMaps[centroidsFound[w]].find(idOfPointToFind);
                 if (centroidsFound[w] != minValueCentroid)
                 {
-                    int sizeOfNearestPointsVec = list[w].nearestPoints.size();
+                    //cout << " IN, ";
+                    int sizeOfNearestPointsVec = list[centroidsFound[w]].nearestPoints.size();
+
                     for (int ii = 0; ii < sizeOfNearestPointsVec; ii++)
                     {
-                        point *curPoint = list[w].nearestPoints[ii];
-                        auto itToEraseNearestPoint = ii + list[w].nearestPoints.begin();
-                        auto itToEraseDist = ii + list[w].dist.begin();
-                        if (curPoint->pVector[0] == idOfPointToFind)
+                        //cout << " ININ, ";
+                        point *curPoint = list[centroidsFound[w]].nearestPoints[ii];
+                        
+                        auto itToEraseNearestPoint = ii + list[centroidsFound[w]].nearestPoints.begin();
+                        auto itToEraseDist = ii + list[centroidsFound[w]].dist.begin();
+
+                        if (curPoint->getKey() == idOfPointToFind)
                         {
                             //erase
-                            list[w].nearestPoints.erase(itToEraseNearestPoint);
-                            list[w].dist.erase(itToEraseDist);
+                            //cout << "Erased, ";
+                            list[centroidsFound[w]].nearestPoints.erase(itToEraseNearestPoint);
+                            list[centroidsFound[w]].dist.erase(itToEraseDist);
                             break;
                         }
                     }
                 }
             }
+            //cout << "\n";
         }
     }
 
@@ -314,7 +336,7 @@ void centroid::initMap(int clusterId)
         for (int i = 0; i < sizeOfVecOfPoints; i++)
         {
             point *pt = this->clusterPoints[i];
-            this->mapOfAssignedItems.insert(pair<int, int>(pt->pVector[0], clusterId));
+            this->mapOfAssignedItems.insert(pair<string, int>(pt->getKey(), clusterId));
         }
     }
     else
@@ -324,7 +346,7 @@ void centroid::initMap(int clusterId)
         for (int i = 0; i < sizeOfVecOfPoints; i++)
         {
             point *pt = this->clusterPoints[i];
-            this->mapOfAssignedItems.insert(pair<int, int>(pt->pVector[0], clusterId));
+            this->mapOfAssignedItems.insert(pair<string, int>(pt->getKey(), clusterId));
         }
     }
 }
@@ -337,20 +359,24 @@ void insertRestOfPoints(vector<point> &vecOfPoints, vector<centroid> &vecOfCentr
     for (int i = 0; i < numOfPoints; i++)
     {
         point *pt = &vecOfPoints[i];
-        int idPoint = pt->pVector[0];
+        string idPoint = pt->getKey();
         int flag = 0;
+
         for (int j = 0; j < numOfCentroids; j++)
         {
             if (vecOfCentroids[j].mapOfAssignedItems.find(idPoint) != vecOfCentroids[j].mapOfAssignedItems.end())
             {
                 flag = 1;
+                //break;
             }
         }
+
         if (flag)
             continue;
 
         float min = MAXFLOAT;
         int cent;
+
         for (int j = 0; j < numOfCentroids; j++)
         {
             float dist = euclDistance(pt, vecOfCentroids[j].coordinates);
@@ -360,9 +386,16 @@ void insertRestOfPoints(vector<point> &vecOfPoints, vector<centroid> &vecOfCentr
                 cent = j;
             }
         }
+
         vecOfCentroids[cent].clusterPoints.push_back(pt);
-        vecOfCentroids[cent].mapOfAssignedItems.insert(pair<int, int>(idPoint, cent));
+        vecOfCentroids[cent].mapOfAssignedItems.insert(pair<string, int>(idPoint, cent));
     }
+
+    // for(int i = 0; i < numOfCentroids; i++)
+    // {
+    //     cout << vecOfCentroids[i].clusterPoints.size() << ", ";
+    // }
+    // cout << endl;
 }
 
 void printToFile(ofstream &outputFileStream, vector<centroid> &vecOfCentroids, chrono::duration<double> sec, char *silh)
@@ -392,13 +425,14 @@ void printToFile(ofstream &outputFileStream, vector<centroid> &vecOfCentroids, c
     {
         silhouette(vecOfCentroids, outputFileStream);
     }
+
     for (int i = 0; i < numOfClusters; i++)
     {
         int sizeOfCluster = vecOfCentroids[i].clusterPoints.size();
         outputFileStream << " CLUSTER-" << i + 1 << ", centroid: ";
         for (int j = 0; j < sizeOfCluster; j++)
         {
-            outputFileStream << "item_id_" << j + 1 << ": " << vecOfCentroids[i].clusterPoints[j]->pVector[0] << ", ";
+            outputFileStream << "item_id_" << j + 1 << ": " << vecOfCentroids[i].clusterPoints[j]->getKey() << ", ";
         }
         outputFileStream << endl;
     }
@@ -410,7 +444,7 @@ void hyperCubeReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoin
     int sizeOfVecOfPoints = vecOfPoints.size();
 
     vector<kNearest> list(sizeOfVecOfCentroids);
-    vector<map<int, double>> vecOfMaps(sizeOfVecOfCentroids);
+    vector<map<string, double>> vecOfMaps(sizeOfVecOfCentroids);
     float min = MAXFLOAT;
     for (int i = 0; i < sizeOfVecOfCentroids; i++)
     {
@@ -418,7 +452,10 @@ void hyperCubeReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoin
         {
             if (i == j)
                 continue;
-            float dist = euclDistance(vecOfCentroids[i].coordinates, vecOfCentroids[j].coordinates);
+
+            float dist;
+            dist = euclDistance(vecOfCentroids[i].coordinates, vecOfCentroids[j].coordinates);
+
             if (dist < min)
             {
                 min = dist;
@@ -446,9 +483,9 @@ void hyperCubeReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoin
         for (int k = 0; k < list[i].nearestPoints.size(); k++)
         {
             point *pointInserted = list[i].nearestPoints[k];
-            int idOfPointInserted = pointInserted->pVector[0];
+            string idOfPointInserted = pointInserted->getKey();
             double distOfPointInserted = list[i].dist[k];
-            vecOfMaps[i].insert(pair<int, double>(idOfPointInserted, distOfPointInserted));
+            vecOfMaps[i].insert(pair<string, double>(idOfPointInserted, distOfPointInserted));
         }
     }
 
@@ -458,7 +495,7 @@ void hyperCubeReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoin
         for (int j = 0; j < sizeOfNearestPointsList; j++)
         {
             point *pointToFind = list[i].nearestPoints[j];
-            int idOfPointToFind = pointToFind->pVector[0];
+            string idOfPointToFind = pointToFind->getKey();
             double distOfPointToFind = list[i].dist[j];
 
             vector<int> centroidsFound;
@@ -504,7 +541,7 @@ void hyperCubeReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoin
                         point *curPoint = list[w].nearestPoints[ii];
                         auto itToEraseNearestPoint = ii + list[w].nearestPoints.begin();
                         auto itToEraseDist = ii + list[w].dist.begin();
-                        if (curPoint->pVector[0] == idOfPointToFind)
+                        if (curPoint->getKey() == idOfPointToFind)
                         {
                             //erase
                             list[w].nearestPoints.erase(itToEraseNearestPoint);

@@ -108,12 +108,10 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    initCentroids(vecOfCentroids, numOfClusters, vecOfPoints);
-    vector<curveMine> vecOfCurves;
-
     // K-MEANS ++, INITIALIZATION
+
     initCentroids(vecOfCentroids, numOfClusters, vecOfPoints);
-    
+
     // LLOYD, LSH REVERSE, HYPERCUBE REVERSE, ASSIGNMENT
 
     if (strcmp(assignment, "Classic") == 0)
@@ -160,21 +158,21 @@ int main(int argc, char *argv[])
         outputFileStream << "Algorithm: Range Search Classic\n";
         printToFile(outputFileStream, vecOfCentroids, end, silhouette);
     }
-    else if (strcmp(assignment, "LSH") == 0)
+    else if (strcmp(assignment, "LSH") == 0 && strcmp(update, "Mean_Vector") == 0)
     {
         // LSH REVERSE
         lshConstants lshCon;
-
         lshCon.k = kLSH;
         lshCon.w = w;
         lshCon.L = L;
+
         vector<hashTable *> vecOfHashTables(L);
         for (int i = 0; i < L; i++)
         {
             vecOfHashTables[i] = new hashTable(numOfLines / 8, &lshCon, numOfDimensions);
         }
 
-        // insert to HashTables...s
+        // insert to HashTables...
         for (int i = 0; i < numOfLines; i++)
         {
             for (int j = 0; j < L; j++)
@@ -195,7 +193,9 @@ int main(int argc, char *argv[])
         {
             flag = 0;
             lshReverse(vecOfCentroids, vecOfPoints, vecOfHashTables);
+
             insertRestOfPoints(vecOfPoints, vecOfCentroids);
+
             updateCentroids(vecOfCentroids, numOfClusters);
             float dist;
             for (int j = 0; j < numOfClusters; j++)
@@ -218,7 +218,103 @@ int main(int argc, char *argv[])
         outputFileStream << "Algorithm: Range Search LSH\n";
         printToFile(outputFileStream, vecOfCentroids, end, silhouette);
     }
-    else if (strcmp(assignment, "HYPER") == 0)
+    else if (strcmp(assignment, "LSH") == 0 && strcmp(update, "Mean_Frechet") == 0)
+    {
+        float delta = 3.25;
+        vector<vector<pair<float, float>>> arrayOfCurves2D(numOfLines);
+        vector<pair<float, float>> arrayOfTxAndTy(L);
+        std::default_random_engine generator;
+        std::uniform_real_distribution<float> distribution(0.0, delta);
+
+        // generate t's for grid
+        for (int i = 0; i < L; i++)
+        {
+            float tx = distribution(generator);
+            float ty = distribution(generator);
+            arrayOfTxAndTy[i] = pair<float, float>(tx, ty);
+        }
+
+        // initialize the curves, x 1 ... N (where N the number of Points a curve has)
+        for (int i = 0; i < numOfLines; i++)
+        {
+            point *curPoint = &vecOfPoints[i];
+            for (int j = 0; j < numOfElements; j++)
+            {
+                float dValue = curPoint->pVector[j];
+                arrayOfCurves2D[i].push_back(pair<float, float>(j + 1, dValue));
+            }
+        }
+
+        lshConstants lshCon;
+        lshCon.k = kLSH;
+        lshCon.w = w;
+        lshCon.L = L;
+
+        vector<hashTable *> vecOfHashTables(L);
+        for (int i = 0; i < L; i++)
+        {
+            vecOfHashTables[i] = new hashTable(numOfLines / 8, &lshCon, numOfDimensions);
+        }
+
+        // insert to HashTables...
+        for (int i = 0; i < numOfLines; i++)
+        {
+            for (int j = 0; j < L; j++)
+            {
+                vector<float> temp;
+                temp = snap(2, arrayOfCurves2D[i], delta, arrayOfTxAndTy[j]);
+
+                //  padding
+                int sizeOfVector = temp.size();
+                for (int i = sizeOfVector - 1; i < 2 * numOfElements; i++)
+                {
+                    temp.push_back(5000); // a number that does not exist in the data set
+                }
+                vecOfHashTables[j]->insert(&vecOfPoints[i], temp);
+            }
+        }
+
+        vector<centroid> temp = vecOfCentroids;
+        int maxIt = 15;
+        int countIt = 1;
+        int flag = 0;
+
+        using clock = std::chrono::system_clock;
+        auto begin = clock::now();
+
+        while (countIt < maxIt && flag < numOfClusters)
+        {
+            flag = 0;
+            lshReverse(vecOfCentroids, vecOfPoints, vecOfHashTables, 1, arrayOfTxAndTy);
+            insertRestOfPoints(vecOfPoints, vecOfCentroids);
+            //updateCentroidsCurve(vecOfCentroids, numOfClusters);
+            updateCentroids(vecOfCentroids, numOfClusters);
+            for(int i = 0; i < numOfClusters; i++)
+                cout << vecOfCentroids[i].clusterPoints.size() << ", ";
+            cout << endl;
+
+            float dist;
+            for (int j = 0; j < numOfClusters; j++)
+            {
+                dist = euclDistance(temp[j].coordinates, vecOfCentroids[j].coordinates);
+                if (dist < 85)
+                    flag++;
+                else
+                    flag = 0;
+            }
+            temp = vecOfCentroids;
+            countIt++;
+        }
+
+        using sec = std::chrono::duration<double>;
+        sec end = clock::now() - begin;
+
+        ofstream outputFileStream;
+        outputFileStream.open(outputFile);
+        outputFileStream << "Algorithm: Range Search LSH Frechet\n";
+        printToFile(outputFileStream, vecOfCentroids, end, silhouette);
+    }
+    else if (strcmp(assignment, "Hypercube") == 0)
     {
         // HYPERCUBE REVERSE
         cubeConstants cubCon;
@@ -268,6 +364,103 @@ int main(int argc, char *argv[])
         ofstream outputFileStream;
         outputFileStream.open(outputFile);
         outputFileStream << "Algorithm: Range Search HYPER CUBE\n";
+        printToFile(outputFileStream, vecOfCentroids, end, silhouette);
+    }
+    else if (strcmp(assignment, "Frechet") == 0)
+    {
+        // LSH REVERSE FRECHET
+        lshConstants lshCon;
+        float delta = 3.25;
+        int numOfPointsInLine = vecOfPoints[0].pVector.size();
+
+        lshCon.k = kLSH;
+        lshCon.w = w;
+        lshCon.L = L;
+        vector<hashTable *> vecOfHashTables(L);
+        for (int i = 0; i < L; i++)
+        {
+            vecOfHashTables[i] = new hashTable(numOfLines / 8, &lshCon, numOfDimensions);
+        }
+
+        vector<vector<pair<float, float>>> arrayOfCurves2D(numOfLines);
+        vector<pair<float, float>> arrayOfTxAndTy(L);
+        std::default_random_engine generator;
+        std::uniform_real_distribution<float> distribution(0.0, delta);
+
+        // generate t's for grid
+        for (int i = 0; i < L; i++)
+        {
+            float tx = distribution(generator);
+            float ty = distribution(generator);
+            arrayOfTxAndTy[i] = pair<float, float>(tx, ty);
+        }
+
+        // initialize the curves, x 1 ... N (where N the number of Points a curve has)
+        for (int i = 0; i < numOfLines; i++)
+        {
+            point *curPoint = &vecOfPoints[i];
+            for (int j = 0; j < numOfPointsInLine; j++)
+            {
+                float dValue = curPoint->pVector[j];
+                arrayOfCurves2D[i].push_back(pair<float, float>(j + 1, dValue));
+            }
+        }
+
+        // insert timeseries to hash tables...
+        vector<vector<float>> arrayOfSnappedCurves(numOfLines);
+        for (int i = 0; i < numOfLines; i++)
+        {
+            for (int j = 0; j < L; j++)
+            {
+                // snaps the curves on the grid, deletes duplicates and returns a vector
+                vector<float> temp;
+                temp = snap(2, arrayOfCurves2D[i], delta, arrayOfTxAndTy[j]);
+
+                //  padding
+                int sizeOfVector = temp.size();
+                for (int i = sizeOfVector - 1; i < 2 * numOfPointsInLine; i++)
+                {
+                    temp.push_back(500); // a number that does not exist in the data set
+                }
+
+                int key = vecOfHashTables[j]->insert(&(vecOfPoints[i]), temp);
+            }
+        }
+
+        vector<centroid> temp = vecOfCentroids;
+        int maxIt = 100;
+        int countIt = 1;
+        int flag = 0;
+
+        using clock = std::chrono::system_clock;
+        auto begin = clock::now();
+
+        while (countIt < maxIt && flag < numOfClusters)
+        {
+            flag = 0;
+            lshReverse(vecOfCentroids, vecOfPoints, vecOfHashTables, 1, arrayOfTxAndTy);
+            insertRestOfPoints(vecOfPoints, vecOfCentroids);
+            updateCentroids(vecOfCentroids, numOfClusters);
+
+            float dist;
+            for (int j = 0; j < numOfClusters; j++)
+            {
+                dist = euclDistance(temp[j].coordinates, vecOfCentroids[j].coordinates);
+                if (dist < 85)
+                    flag++;
+                else
+                    flag = 0;
+            }
+            temp = vecOfCentroids;
+            countIt++;
+        }
+
+        using sec = std::chrono::duration<double>;
+        sec end = clock::now() - begin;
+
+        ofstream outputFileStream;
+        outputFileStream.open(outputFile);
+        outputFileStream << "Algorithm: Range Search LSH\n";
         printToFile(outputFileStream, vecOfCentroids, end, silhouette);
     }
 

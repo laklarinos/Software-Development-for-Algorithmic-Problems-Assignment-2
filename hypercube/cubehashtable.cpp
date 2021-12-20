@@ -265,7 +265,18 @@ void hashTableCube::findNeighborsR(point *queryPoint, kNearest *nearestList, int
                 break;
             }
             point *curPoint = (*it)->getPVector();
+            int found;
+            for (int i = 0; i < nearestList->nearestPoints.size(); i++)
+            {
+                if (curPoint->getKey() == nearestList->nearestPoints[i]->getKey())
+                {
+                    found = 1;
+                    break;
+                }
+            }
+            if(found) continue;
             double dist = euclDistance(queryPoint, curPoint);
+
             if (dist < R && dist > 0)
             {
                 mCounted++;

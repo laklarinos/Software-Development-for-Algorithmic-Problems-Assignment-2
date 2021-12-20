@@ -11,6 +11,8 @@ class hashTableCube;
 #include "../importantStructs/point.h"
 #include "../Fred-master/include/frechet.hpp"
 
+static vector<vector<float>> DEFAULT_VECTOR;
+
 int euclideanRemainder(int a, int b);
 int myPow(int x, int p);
 double euclDistance(point *point1, point *point2);
@@ -23,7 +25,7 @@ bool checkCommandLineArguments(int argcInt, char *argvArray[]);
 void initKNearest(int k, kNearest *list);
 void sortNearest(kNearest *list);
 vector<float> snap(int dim, vector<pair<float, float>> &mapCurve, double delta, pair<float, float> txAndTy);
-float DFD(vector<float> curve1, vector<float> curve2);
+float DFD(vector<float> curve1, vector<float> curve2, int meanFrechet = 0, vector<vector<float>> &vecToFill = DEFAULT_VECTOR);
 float CFD(vector<float> curve1, vector<float> curve2);
 float euclDistanceOf2Points(float x1, float x2, float y1, float y2);
 Curve toRepoCurve(vector<float> myCurve);
@@ -35,7 +37,8 @@ void printToFile(char *outputFile,
                  int numberOfNN,
                  vector<point> &arrayOfCurves1DQ,
                  vector<vector<vector<float>>> const &arrayOfCurves1DQSnapped = {});
-vector<float> meanCurve(vector<vector<float>>& vecOfCurves);
-vector<float> meanFrechet(vector<float>& curve1, vector<float>& curve2);
+vector<float> meanCurve(vector<vector<float>> &vecOfCurves);
+void meanFrechet(vector<float> &curve1, vector<float> &curve2, vector<float> *vecToFill);
+vector<pair<int, int>> getOptimalTraversal(vector<vector<float>> vecOfDFD, vector<float> &curve1, vector<float> &curve2);
 
 #endif

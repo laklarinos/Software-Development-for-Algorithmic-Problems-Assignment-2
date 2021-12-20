@@ -2,9 +2,8 @@
 #define CLUSTER
 
 #include "../helpers/helpers.h"
-#include "clusterhashtable.h"
+//#include "clusterhashtable.h"
 #include "../helpers/includes.h"
-#include "../importantStructs/curveMine.h"
 
 class centroid
 {
@@ -15,24 +14,13 @@ public:
     //vector<curveMine *> clusterCurve;
     centroid(point *);
     void includePoint(point *);
-    map<int, int> mapOfAssignedItems;
+    map<string, int> mapOfAssignedItems;
     void initMap(int clusterId);
-};
-
-class centroidCurves
-{
-public:
-    curveMine *coordinates;
-    vector<curveMine *> clusterPoints;
-    centroidCurves(curveMine *);
-    void includePoint(curveMine *);
-    map<int, int> mapOfAssignedItems;
-    void initMap(string clusterId);
 };
 
 void initCentroids(vector<centroid> &vecOfCentroids, int numOfClusters, vector<point> &vectorOfPoints, int frechet = 0);
 //void initCentroidsFrechet(vector<centroid> &vecOfCentroids, int numOfClusters, vector<curveMine> &vectorOfPoints);
-void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, vector<hashTable *> &vecOfHashTables);
+void lshReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, vector<hashTable *> &vecOfHashTables, int frechet = 0, vector<pair<float,float>> vecOfTxAndTy = vector<pair<float,float>>{});
 void hyperCubeReverse(vector<centroid> &vecOfCentroids, vector<point> &vecOfPoints, hashTableCube *hashT, int probes, int M);
 void updateCentroids(vector<centroid> &vecOfCentroids, int numOfClusters);
 void updateCentroidsCurve(vector<centroid> &vecOfCentroids, int numOfClusters);

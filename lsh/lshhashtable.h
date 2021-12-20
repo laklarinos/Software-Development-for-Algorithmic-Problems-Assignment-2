@@ -45,7 +45,7 @@ public:
 
     void findKNeighborsTrue(point *queryPoint, kNearest *nearestList, vector<float> vecFloat = vector<float>(), int continuous = 0);
 
-    void findNeighborsR(point *queryPoint, kNearest *nearestList, int R, int frechet = 0);
+    void findNeighborsR(point *queryPoint, kNearest *nearestList, int R, vector<float> vecFloat = vector<float>(), int frechet = 0);
 };
 
 #endif
